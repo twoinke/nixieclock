@@ -44,10 +44,12 @@ void time_is_set(bool from_sntp /* <= this optional parameter can be used with E
   Serial.print(F("time was sent! from_sntp=")); Serial.println(from_sntp);
 }
 
+
 uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 {
-  return 12 * 60 * 60 * 1000UL; // 12 hours
+  return 24 * 60 * 60 * 1000UL; // 24 hours
 }
+
 
 void IRAM_ATTR TimerHandler()
 {
@@ -134,7 +136,7 @@ void writeByte(byte b)
 
 
 void setup() 
-{  
+{   
   pinMode(D0, OUTPUT);  
   pinMode(D1, OUTPUT);  
   pinMode(D2, OUTPUT);  
@@ -147,7 +149,7 @@ void setup()
   writeByte(0);
  
   Serial.begin(115200);
-  delay(1000);
+ // delay(1000);
   Serial.print("Nixie NTP Clock");
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
