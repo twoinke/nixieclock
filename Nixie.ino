@@ -35,7 +35,7 @@ ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
 
 
-#define HW_TIMER_INTERVAL_MS         4L
+#define HW_TIMER_INTERVAL_MS         2L
 #define TIMER_INTERVAL_1S            1000L
 
 byte tubes[4];
@@ -154,7 +154,7 @@ void setup()
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
-
+  WiFi.hostname("Nixieclock");
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
