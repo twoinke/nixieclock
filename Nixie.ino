@@ -154,7 +154,7 @@ void setup()
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
-  WiFi.hostname("Nixieclock");
+  WiFi.setHostname("Nixieclock");
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
