@@ -43,8 +43,7 @@ ESP8266_ISR_Timer ISR_Timer;
 int8_t tubes[4];
 int8_t tmp;
 
-// translation table to fix mixup of nixie pins on PCB
-int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
+
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
   Serial.print(F("time was sent! from_sntp=")); Serial.println(from_sntp);
@@ -93,6 +92,9 @@ void IRAM_ATTR updateNixies()
 
 void IRAM_ATTR setNixieTube(int8_t tube_nr, int8_t bcdval)
 {
+  // translation table to fix mixup of nixie pins on PCB
+  static int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
+  
   tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
 }
 
