@@ -1,4 +1,12 @@
 
+#include "ESP8266TimerInterrupt.h"
+#include "ESP8266_ISR_Timer.h"
+#include <ESP8266WiFi.h>
+#include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
+#include <time.h>
+#include <coredecls.h> // optional settimeofday_cb() callback to check on server
+
+
 #ifndef STASSID
 #define STASSID "Kamar_Taj"
 #define STAPSK  "!Shamballa!"
@@ -8,19 +16,12 @@
 #define MY_NTP_SERVER "de.pool.ntp.org"           
 #define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  
 
-#include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
 
 // Select a Timer Clock
 #define USING_TIM_DIV1                false           // for shortest and most accurate timer
 #define USING_TIM_DIV16               false           // for medium time and medium accurate timer
 #define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
 
-#include "ESP8266TimerInterrupt.h"
-#include "ESP8266_ISR_Timer.h"
-
-#include <ESP8266WiFi.h>
-#include <time.h>
-#include <coredecls.h> // optional settimeofday_cb() callback to check on server
 
 const char *ssid     = STASSID;
 const char *password = STAPSK;
@@ -34,25 +35,14 @@ ESP8266Timer ITimer;
 // Init ESP8266_ISR_Timer
 ESP8266_ISR_Timer ISR_Timer;
 
-
 #define HW_TIMER_INTERVAL_MS         5L
 #define TIMER_INTERVAL_1S            1000L
 
-byte tubes[4];
-byte tmp;
+int8_t tubes[4];
+int8_t tmp;
 
-byte trans[] = {
-  1,
-  0,
-  9,
-  8,
-  7,
-  6,
-  5,
-  4,
-  3,
-  2
-};
+// translation table to fix mixup of nixie pins on PCB
+int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
   Serial.print(F("time was sent! from_sntp=")); Serial.println(from_sntp);
@@ -64,9 +54,9 @@ uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 }
 
 
-byte IRAM_ATTR dec_to_bcd(byte dec)
+int8_t IRAM_ATTR dec_to_bcd(int8_t dec)
 {
-  byte result;
+  int8_t result;
   
   result |= (dec / 10) << 4;
   result |= (dec % 10) << 0;
@@ -74,7 +64,7 @@ byte IRAM_ATTR dec_to_bcd(byte dec)
   return result;
 }
 
-void IRAM_ATTR writeByte(byte b)
+void IRAM_ATTR writeByte(int8_t b)
 {
   digitalWrite(D0, bitRead(b, 0));
   digitalWrite(D1, bitRead(b, 1));
@@ -99,7 +89,7 @@ void IRAM_ATTR updateNixies()
 }
 
 
-void IRAM_ATTR setNixieTube(byte tube_nr, byte bcdval)
+void IRAM_ATTR setNixieTube(int8_t tube_nr, int8_t bcdval)
 {
   tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
 }
@@ -107,8 +97,8 @@ void IRAM_ATTR setNixieTube(byte tube_nr, byte bcdval)
 
 void IRAM_ATTR getTime()
 { 
-  static byte cnt = 0;
-  static byte tmp = 0;
+  static int8_t cnt = 0;
+  static int8_t tmp = 0;
   
   time(&now);
   localtime_r(&now, &tm);
@@ -153,7 +143,7 @@ void IRAM_ATTR getTime()
     return;
   }
   
-  tmp = dec_to_bcd((byte)tm.tm_min);
+  tmp = dec_to_bcd((int8_t)tm.tm_min);
   
   //tmp2 = 0x0f & tmp;
   //tubes[3] = ((1 << 3) << 4) | trans[tmp2];
@@ -165,7 +155,7 @@ void IRAM_ATTR getTime()
   setNixieTube(2, (tmp >> 4));
 
 
-  tmp = dec_to_bcd((byte)tm.tm_hour);
+  tmp = dec_to_bcd((int8_t)tm.tm_hour);
   setNixieTube(1, 0x0f & tmp);
   setNixieTube(0, (tmp >> 4));
  
