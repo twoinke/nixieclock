@@ -13,7 +13,9 @@
 #endif
 
 /* Configuration of NTP */
-#define MY_NTP_SERVER "de.pool.ntp.org"           
+#define MY_NTP_SERVER "de.pool.ntp.org"  
+  
+         
 #define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  
 
 
@@ -105,7 +107,7 @@ void IRAM_ATTR getTime()
 
   digitalWrite(D8, !digitalRead(D8));
 
-
+/*
   Serial.print("year:");
   Serial.print(tm.tm_year + 1900);  // years since 1900
   Serial.print("\tmonth:");
@@ -125,10 +127,10 @@ void IRAM_ATTR getTime()
   else
     Serial.print("\tstandard");
   Serial.println();
-
+*/
   // screensaver :-)
  
-  if (tm.tm_hour == 23 && tm.tm_min >= 0 && tm.tm_min <= 5)
+  if (tm.tm_hour == 0 && tm.tm_min >= 0 && tm.tm_min <= 5)
   {
     setNixieTube(3, cnt);
     setNixieTube(2, cnt);
@@ -144,13 +146,6 @@ void IRAM_ATTR getTime()
   }
   
   tmp = dec_to_bcd((int8_t)tm.tm_min);
-  
-  //tmp2 = 0x0f & tmp;
-  //tubes[3] = ((1 << 3) << 4) | trans[tmp2];
-  //setNixieTube(3, 0x0f & tmp);
-  
-  //tmp2 = (tmp >> 4);
-  //tubes[2] = ((1 << 2) << 4) | trans[tmp2];
   setNixieTube(3, 0x0f & tmp);
   setNixieTube(2, (tmp >> 4));
 
@@ -159,19 +154,9 @@ void IRAM_ATTR getTime()
   setNixieTube(1, 0x0f & tmp);
   setNixieTube(0, (tmp >> 4));
  
-  //tmp2 = 0x0f & tmp;
-  //tubes[1] = ((1 << 1) << 4) | trans[tmp2];
-  //setNixieTube(1, tmp2);
-
-  //tmp2 = (tmp >> 4);
-  //tubes[0] = ((1 << 0) << 4) | trans[tmp2];
-  //setNixieTube(0, tmp2);
-
   //Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
 }
   
-
-
 
 void setup() 
 {   
@@ -186,30 +171,23 @@ void setup()
   pinMode(D7, OUTPUT);  
   pinMode(D8, OUTPUT);  
 
-  //writeByte(0);
+  writeByte(0);
   digitalWrite(D8, 0); // LEDs
 
-  setNixieTube(0, 6);
-  setNixieTube(1, 5);
-  setNixieTube(2, 0);
-  setNixieTube(3, 2);
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   
 
   Serial.begin(115200);
  // delay(1000);
-  Serial.print("Nixie NTP Clock");
+  Serial.print("\n\nNixie NTP Clock\n\n");
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
-  
-  //WiFi.setHostname("Nixieclock");
-  //WiFi.hostname("Nixieclock");
-  
 
   
   WiFi.persistent(false);
-  
+
+  Serial.printf("Connecting to Wifi \"%s\" ", ssid);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
