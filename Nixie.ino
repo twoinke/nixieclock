@@ -35,15 +35,28 @@ ESP8266Timer ITimer;
 ESP8266_ISR_Timer ISR_Timer;
 
 
-#define HW_TIMER_INTERVAL_MS         2L
+#define HW_TIMER_INTERVAL_MS         5L
 #define TIMER_INTERVAL_1S            1000L
 
 byte tubes[4];
+byte tmp;
+
+byte trans[] = {
+  1,
+  0,
+  9,
+  8,
+  7,
+  6,
+  5,
+  4,
+  3,
+  2
+};
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
   Serial.print(F("time was sent! from_sntp=")); Serial.println(from_sntp);
 }
-
 
 uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 {
@@ -51,7 +64,30 @@ uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 }
 
 
-void IRAM_ATTR TimerHandler()
+byte IRAM_ATTR dec_to_bcd(byte dec)
+{
+  byte result;
+  
+  result |= (dec / 10) << 4;
+  result |= (dec % 10) << 0;
+  
+  return result;
+}
+
+void IRAM_ATTR writeByte(byte b)
+{
+  digitalWrite(D0, bitRead(b, 0));
+  digitalWrite(D1, bitRead(b, 1));
+  digitalWrite(D2, bitRead(b, 2));
+  digitalWrite(D3, bitRead(b, 3));
+  digitalWrite(D4, bitRead(b, 4));
+  digitalWrite(D5, bitRead(b, 5));
+  digitalWrite(D6, bitRead(b, 6));
+  digitalWrite(D7, bitRead(b, 7));
+}
+
+
+void IRAM_ATTR updateNixies()
 {
   static int8_t tube = 4;
 
@@ -63,14 +99,23 @@ void IRAM_ATTR TimerHandler()
 }
 
 
-void getTime()
-{ 
-  static byte tmp, tmp2;
+void IRAM_ATTR setNixieTube(byte tube_nr, byte bcdval)
+{
+  tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
+}
 
+
+void IRAM_ATTR getTime()
+{ 
+  static byte cnt = 0;
+  static byte tmp = 0;
+  
   time(&now);
   localtime_r(&now, &tm);
 
-/*
+  digitalWrite(D8, !digitalRead(D8));
+
+
   Serial.print("year:");
   Serial.print(tm.tm_year + 1900);  // years since 1900
   Serial.print("\tmonth:");
@@ -90,53 +135,57 @@ void getTime()
   else
     Serial.print("\tstandard");
   Serial.println();
-  */
-  
+
+  // screensaver :-)
+ 
+  if (tm.tm_hour == 23 && tm.tm_min >= 0 && tm.tm_min <= 5)
+  {
+    setNixieTube(3, cnt);
+    setNixieTube(2, cnt);
+    setNixieTube(1, cnt);
+    setNixieTube(0, cnt);
+
+    cnt++;
+    if (cnt == 10)
+    {
+      cnt = 0;
+    }
+    return;
+  }
   
   tmp = dec_to_bcd((byte)tm.tm_min);
-  tmp2 = 0x0f & tmp;
-  tubes[0] = ((1 << 0) << 4) | tmp2;
+  
+  //tmp2 = 0x0f & tmp;
+  //tubes[3] = ((1 << 3) << 4) | trans[tmp2];
+  //setNixieTube(3, 0x0f & tmp);
+  
+  //tmp2 = (tmp >> 4);
+  //tubes[2] = ((1 << 2) << 4) | trans[tmp2];
+  setNixieTube(3, 0x0f & tmp);
+  setNixieTube(2, (tmp >> 4));
 
-  tmp2 = (tmp >> 4);
-  tubes[1] = ((1 << 1) << 4) | tmp2;
 
   tmp = dec_to_bcd((byte)tm.tm_hour);
-  tmp2 = 0x0f & tmp;
-  tubes[2] = ((1 << 2) << 4) | tmp2;
+  setNixieTube(1, 0x0f & tmp);
+  setNixieTube(0, (tmp >> 4));
+ 
+  //tmp2 = 0x0f & tmp;
+  //tubes[1] = ((1 << 1) << 4) | trans[tmp2];
+  //setNixieTube(1, tmp2);
 
-  tmp2 = (tmp >> 4);
-  tubes[3] = ((1 << 3) << 4) | tmp2;
-  
-  
+  //tmp2 = (tmp >> 4);
+  //tubes[0] = ((1 << 0) << 4) | trans[tmp2];
+  //setNixieTube(0, tmp2);
+
   //Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
 }
   
 
-byte dec_to_bcd(byte dec)
-{
-  byte result = 0;
-  
-  result |= (dec / 10) << 4;
-  result |= (dec % 10) << 0;
-  
-  return result;
-}
-
-void writeByte(byte b)
-{
-  digitalWrite(D0, bitRead(b, 0));
-  digitalWrite(D1, bitRead(b, 1));
-  digitalWrite(D2, bitRead(b, 2));
-  digitalWrite(D3, bitRead(b, 3));
-  digitalWrite(D4, bitRead(b, 4));
-  digitalWrite(D5, bitRead(b, 5));
-  digitalWrite(D6, bitRead(b, 6));
-  digitalWrite(D7, bitRead(b, 7));
-}
 
 
 void setup() 
 {   
+
   pinMode(D0, OUTPUT);  
   pinMode(D1, OUTPUT);  
   pinMode(D2, OUTPUT);  
@@ -145,17 +194,32 @@ void setup()
   pinMode(D5, OUTPUT);  
   pinMode(D6, OUTPUT);  
   pinMode(D7, OUTPUT);  
+  pinMode(D8, OUTPUT);  
 
-  writeByte(0);
- 
+  //writeByte(0);
+  digitalWrite(D8, 0); // LEDs
+
+  setNixieTube(0, 6);
+  setNixieTube(1, 5);
+  setNixieTube(2, 0);
+  setNixieTube(3, 2);
+  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
+  
+
   Serial.begin(115200);
  // delay(1000);
   Serial.print("Nixie NTP Clock");
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
-  WiFi.setHostname("Nixieclock");
+  
+  //WiFi.setHostname("Nixieclock");
+  //WiFi.hostname("Nixieclock");
+  
+
+  
   WiFi.persistent(false);
+  
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
@@ -164,8 +228,14 @@ void setup()
     Serial.print ( "." );
   }
 
-  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, TimerHandler);
+  Serial.println();
+
+  Serial.print("Connected, IP address: ");
+  Serial.println(WiFi.localIP());
+  
+  
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
+
 }
 
 void loop() {}
