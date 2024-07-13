@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 
+
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
@@ -192,6 +193,7 @@ void setup()
 
   Serial.printf("Connecting to Wifi \"%s\" ", ssid);
   WiFi.mode(WIFI_STA);
+  WiFi.hostname(MY_HOSTNAME);
   WiFi.begin(ssid, password);
 
   while ( WiFi.status() != WL_CONNECTED ) {
