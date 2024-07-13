@@ -2,6 +2,8 @@
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
@@ -12,6 +14,7 @@
 #define STAPSK  "!Shamballa!"
 #endif
 
+#define MY_HOSTNAME "nixieclock"
 /* Configuration of NTP */
 #define MY_NTP_SERVER "de.pool.ntp.org"  
   
@@ -200,7 +203,12 @@ void setup()
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
-  
+
+
+  if (!MDNS.begin(MY_HOSTNAME))
+  {
+    Serial.println("Error setting up mDNS responder");  
+  }
   
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
 
