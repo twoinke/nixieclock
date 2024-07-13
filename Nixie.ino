@@ -41,8 +41,6 @@ ESP8266_ISR_Timer ISR_Timer;
 #define TIMER_INTERVAL_1S            1000L
 
 int8_t tubes[4];
-int8_t tmp;
-
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
