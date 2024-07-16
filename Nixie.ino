@@ -3,21 +3,17 @@
 #include "ESP8266_ISR_Timer.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ESP8266WebServer.h> 
 
-
+#include <WiFiManager.h> 
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
 
-
-#ifndef STASSID
-#define STASSID "Kamar_Taj"
-#define STAPSK  "!Shamballa!"
-#endif
-
 #define MY_HOSTNAME "nixieclock"
 /* Configuration of NTP */
 #define MY_NTP_SERVER "de.pool.ntp.org"  
+
   
          
 #define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  
@@ -29,8 +25,9 @@
 #define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
 
 
-const char *ssid     = STASSID;
-const char *password = STAPSK;
+char hostname[32];
+char ntp_server[32];
+char timezone[32];
 
 time_t now;
 tm tm;
@@ -44,7 +41,10 @@ ESP8266_ISR_Timer ISR_Timer;
 #define HW_TIMER_INTERVAL_MS         5L
 #define TIMER_INTERVAL_1S            1000L
 
+ESP8266WebServer server(80);
 int8_t tubes[4];
+int8_t blink = 0;
+int8_t enabled = 1;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -84,6 +84,12 @@ void IRAM_ATTR updateNixies()
 {
   static int8_t tube = 4;
 
+  
+  if (! enabled)
+  {
+    return;
+  }
+
   ISR_Timer.run();
 
   if (tube == 0) tube = 4;
@@ -105,12 +111,16 @@ void IRAM_ATTR getTime()
 { 
   static int8_t cnt = 0;
   static int8_t tmp = 0;
+
   
   time(&now);
   localtime_r(&now, &tm);
 
-  digitalWrite(D8, !digitalRead(D8));
-
+  if (blink)
+  {
+    digitalWrite(D8, !digitalRead(D8)); 
+  }
+ 
 /*
   Serial.print("year:");
   Serial.print(tm.tm_year + 1900);  // years since 1900
@@ -164,7 +174,6 @@ void IRAM_ATTR getTime()
 
 void setup() 
 {   
-
   pinMode(D0, OUTPUT);  
   pinMode(D1, OUTPUT);  
   pinMode(D2, OUTPUT);  
@@ -173,10 +182,29 @@ void setup()
   pinMode(D5, OUTPUT);  
   pinMode(D6, OUTPUT);  
   pinMode(D7, OUTPUT);  
-  pinMode(D8, OUTPUT);  
+  pinMode(D8, OUTPUT); 
 
   writeByte(0);
   digitalWrite(D8, 0); // LEDs
+
+  WiFiManager wifiManager;
+
+  strcpy(ntp_server, MY_HOSTNAME);
+  strcpy(hostname, MY_NTP_SERVER);
+  strcpy(timezone, MY_TZ);
+  
+  
+  WiFiManagerParameter custom_hostname("hostname", "Hostname", hostname, 32);
+  WiFiManagerParameter custom_ntp_server("ntp_server", "NTP Server", ntp_server, 32);
+  WiFiManagerParameter custom_timezone("ntp_server", "Time Zone", timezone, 32);
+  
+
+  wifiManager.addParameter(&custom_hostname);
+  wifiManager.addParameter(&custom_ntp_server);
+  wifiManager.addParameter(&custom_timezone);
+  
+ 
+
 
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   
@@ -184,14 +212,27 @@ void setup()
   Serial.begin(115200);
  // delay(1000);
   Serial.print("\n\nNixie NTP Clock\n\n");
+  Serial.print("\n\n2018-2024 Thomas Woinke\n\n");
+  
 
-  settimeofday_cb(time_is_set); // optional: callback if time was sent
-  configTime(MY_TZ, MY_NTP_SERVER); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
   
-  WiFi.persistent(false);
+  //WiFi.persistent(false);
 
-  Serial.printf("Connecting to Wifi \"%s\" ", ssid);
+  Serial.printf("Connecting to Wifi..");
+
+  wifiManager.autoConnect("NixieConfigAP");
+
+  strcpy(hostname, custom_hostname.getValue()); 
+  strcpy(ntp_server, custom_ntp_server.getValue());
+  strcpy(timezone, custom_timezone.getValue());
+
+  WiFi.hostname(hostname);
+
+  settimeofday_cb(time_is_set); // optional: callback if time was sent
+  configTime(timezone, ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
+
+  /*
   WiFi.mode(WIFI_STA);
   WiFi.hostname(MY_HOSTNAME);
   WiFi.begin(ssid, password);
@@ -200,20 +241,70 @@ void setup()
     delay ( 500 );
     Serial.print ( "." );
   }
-
+*/
   Serial.println();
 
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
 
 
-  if (!MDNS.begin(MY_HOSTNAME))
+  if (!MDNS.begin(hostname))
   {
     Serial.println("Error setting up mDNS responder");  
   }
   
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
 
+  server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
+  server.on("/blink/", handleBlink);
+  server.on("/off/", handleOff);
+  server.on("/on/", handleOn);
+  
+  
+  server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
+
+  server.begin();                           // Actually start the server
+  Serial.println("HTTP server started");
 }
 
-void loop() {}
+void loop(void){
+  server.handleClient();                    // Listen for HTTP requests from clients
+}
+
+void handleRoot() {
+  char resp[100];
+  time(&now);
+  localtime_r(&now, &tm);
+
+  sprintf(resp, "<html><head><title>Nixieclock</title></head><body><h1>Nixieclock</h1><p>The time is: %02d:%02d:%02d</p></body></html>", tm.tm_hour, tm.tm_min, tm.tm_sec);
+  server.send(200, "text/html", resp);   // Send HTTP status 200 (Ok) and send some text to the browser/client
+}
+
+void handleBlink()
+{
+  blink = !blink;
+  digitalWrite(D8, 0); // LEDs
+  server.sendHeader("Location","/");
+  server.send(303);  
+}
+
+void handleOff()
+{
+  enabled = 0;
+  digitalWrite(D8, 0); // LEDs
+  writeByte(0);
+  server.sendHeader("Location","/");
+  server.send(303);  
+}
+
+void handleOn()
+{
+  enabled = 1;
+  server.sendHeader("Location","/");
+  server.send(303);  
+}
+
+
+void handleNotFound(){
+  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+}
