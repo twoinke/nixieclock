@@ -195,7 +195,12 @@ void setup()
   pinMode(D8, OUTPUT); 
 
   writeByte(0);
+  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
+
   digitalWrite(D8, 0); // LEDs
+  writeByte(0);
+  setNixieTube(0, 1);
+  
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
@@ -237,6 +242,9 @@ void setup()
   }
   //end read
 
+  writeByte(0);
+  setNixieTube(1, 1);
+
 
 
   
@@ -253,7 +261,6 @@ void setup()
  
 
 
-  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   
 
  
@@ -261,7 +268,8 @@ void setup()
   Serial.print("\n\nNixie NTP Clock\n\n");
   Serial.print("\n\n2018-2024 Thomas Woinke\n\n");
   
-
+  writeByte(0);
+  setNixieTube(2, 1);
 
   
   //WiFi.persistent(false);
@@ -273,6 +281,8 @@ void setup()
   strcpy(hostname,    custom_hostname.getValue()); 
   strcpy(ntp_server,  custom_ntp_server.getValue());
   strcpy(timezone,    custom_timezone.getValue());
+
+  
 
    //save the custom parameters to FS
   if (shouldSaveConfig) {
@@ -295,6 +305,9 @@ void setup()
     configFile.close();
     //end save
   }
+
+  writeByte(0);
+  setNixieTube(3, 1);
 
   WiFi.hostname(hostname);
 
@@ -338,9 +351,16 @@ void handleRoot()
   String resp;
   time(&now);
   localtime_r(&now, &tm);
+  char time[11];
 
-  header = "<html><head><title>Nixieclock</title></head>";
-  body   = "<body>foo</body>";
+
+  sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+  
+  header = "<html><head><title>Nixieclock</title></head><body>";
+  body   = "<body><h1>Nixieclock</h1>";
+  body  += "<p>Hostname:" + String(hostname) + "</p>";
+  body  += "<p>The time is:" + String(time) + "</p>";
+  body  += "<p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>";
   footer = "</body></html>";
 
   resp = header + body + footer;
