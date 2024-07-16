@@ -1,22 +1,22 @@
 
-#include "ESP8266TimerInterrupt.h"
-#include "ESP8266_ISR_Timer.h"
+#include <FS.h> //this needs to be first, or it all crashes and burns...
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h> 
 
 #include <WiFiManager.h> 
+
+#include "ESP8266TimerInterrupt.h"
+#include "ESP8266_ISR_Timer.h"
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
+#include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
+
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
 
-#define MY_HOSTNAME "nixieclock"
-/* Configuration of NTP */
+#define MY_HOSTNAME   "nixieclock"
 #define MY_NTP_SERVER "de.pool.ntp.org"  
-
-  
-         
-#define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  
+#define MY_TZ         "CET-1CEST,M3.5.0/02,M10.5.0/03"  
 
 
 // Select a Timer Clock
@@ -37,6 +37,8 @@ ESP8266Timer ITimer;
 
 // Init ESP8266_ISR_Timer
 ESP8266_ISR_Timer ISR_Timer;
+
+WiFiManager wifiManager;
 
 #define HW_TIMER_INTERVAL_MS         5L
 #define TIMER_INTERVAL_1S            1000L
@@ -170,7 +172,15 @@ void IRAM_ATTR getTime()
  
   //Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
 }
-  
+
+//flag for saving data
+bool shouldSaveConfig = false;
+
+//callback notifying us of the need to save config
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
 
 void setup() 
 {   
@@ -187,16 +197,53 @@ void setup()
   writeByte(0);
   digitalWrite(D8, 0); // LEDs
 
-  WiFiManager wifiManager;
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  strcpy(ntp_server, MY_HOSTNAME);
-  strcpy(hostname, MY_NTP_SERVER);
+  strcpy(ntp_server, MY_NTP_SERVER);
+  strcpy(hostname, MY_HOSTNAME);
   strcpy(timezone, MY_TZ);
+
+  Serial.begin(115200);
+  Serial.println("mounting FS...");
+
+  if (SPIFFS.begin()) {
+    Serial.println("mounted file system");
+    if (SPIFFS.exists("/config.json")) {
+      //file exists, reading and loading
+      Serial.println("reading config file");
+      File configFile = SPIFFS.open("/config.json", "r");
+      if (configFile) {
+        Serial.println("opened config file");
+        size_t size = configFile.size();
+        // Allocate a buffer to store contents of the file.
+        std::unique_ptr<char[]> buf(new char[size]);
+
+        configFile.readBytes(buf.get(), size);
+        DynamicJsonBuffer jsonBuffer;
+        JsonObject& json = jsonBuffer.parseObject(buf.get());
+        json.printTo(Serial);
+        if (json.success()) {
+          Serial.println("\nparsed json");
+          strcpy(ntp_server, json["n"]);
+          strcpy(hostname, json["h"]);
+          strcpy(timezone, json["t"]);
+        } else {
+          Serial.println("failed to load json config");
+        }
+      }
+    }
+  } else {
+    Serial.println("failed to mount FS");
+  }
+  //end read
+
+
+
   
   
   WiFiManagerParameter custom_hostname("hostname", "Hostname", hostname, 32);
   WiFiManagerParameter custom_ntp_server("ntp_server", "NTP Server", ntp_server, 32);
-  WiFiManagerParameter custom_timezone("ntp_server", "Time Zone", timezone, 32);
+  WiFiManagerParameter custom_timezone("timezone", "Time Zone", timezone, 32);
   
 
   wifiManager.addParameter(&custom_hostname);
@@ -209,7 +256,7 @@ void setup()
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   
 
-  Serial.begin(115200);
+ 
  // delay(1000);
   Serial.print("\n\nNixie NTP Clock\n\n");
   Serial.print("\n\n2018-2024 Thomas Woinke\n\n");
@@ -223,25 +270,37 @@ void setup()
 
   wifiManager.autoConnect("NixieConfigAP");
 
-  strcpy(hostname, custom_hostname.getValue()); 
-  strcpy(ntp_server, custom_ntp_server.getValue());
-  strcpy(timezone, custom_timezone.getValue());
+  strcpy(hostname,    custom_hostname.getValue()); 
+  strcpy(ntp_server,  custom_ntp_server.getValue());
+  strcpy(timezone,    custom_timezone.getValue());
+
+   //save the custom parameters to FS
+  if (shouldSaveConfig) {
+    Serial.println("saving config");
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject& json = jsonBuffer.createObject();
+    json["n"] = ntp_server;
+    json["h"] = hostname;
+    json["t"] = timezone;
+    
+    
+
+    File configFile = SPIFFS.open("/config.json", "w");
+    if (!configFile) {
+      Serial.println("failed to open config file for writing");
+    }
+
+    json.printTo(Serial);
+    json.printTo(configFile);
+    configFile.close();
+    //end save
+  }
 
   WiFi.hostname(hostname);
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(timezone, ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
-  /*
-  WiFi.mode(WIFI_STA);
-  WiFi.hostname(MY_HOSTNAME);
-  WiFi.begin(ssid, password);
-
-  while ( WiFi.status() != WL_CONNECTED ) {
-    delay ( 500 );
-    Serial.print ( "." );
-  }
-*/
   Serial.println();
 
   Serial.print("Connected, IP address: ");
@@ -259,7 +318,7 @@ void setup()
   server.on("/blink/", handleBlink);
   server.on("/off/", handleOff);
   server.on("/on/", handleOn);
-  
+  server.on("/reset/", handleReset);
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
@@ -271,12 +330,21 @@ void loop(void){
   server.handleClient();                    // Listen for HTTP requests from clients
 }
 
-void handleRoot() {
-  char resp[100];
+void handleRoot() 
+{
+  String header;
+  String body;
+  String footer;
+  String resp;
   time(&now);
   localtime_r(&now, &tm);
 
-  sprintf(resp, "<html><head><title>Nixieclock</title></head><body><h1>Nixieclock</h1><p>The time is: %02d:%02d:%02d</p></body></html>", tm.tm_hour, tm.tm_min, tm.tm_sec);
+  header = "<html><head><title>Nixieclock</title></head>";
+  body   = "<body>foo</body>";
+  footer = "</body></html>";
+
+  resp = header + body + footer;
+  //sprintf(resp.s_str(), "<body><h1>Nixieclock</h1><p>Hostname: %s</p><p>The time is: %02d:%02d:%02d</p></body></html>", hostname, tm.tm_hour, tm.tm_min, tm.tm_sec);
   server.send(200, "text/html", resp);   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }
 
@@ -302,6 +370,13 @@ void handleOn()
   enabled = 1;
   server.sendHeader("Location","/");
   server.send(303);  
+}
+
+void handleReset()
+{
+  wifiManager.resetSettings();
+  server.sendHeader("Location","/");
+  server.send(303); 
 }
 
 
