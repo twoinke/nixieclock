@@ -177,6 +177,8 @@ void IRAM_ATTR getTime()
 //flag for saving data
 bool shouldSaveConfig = false;
 
+unsigned long ota_progress_millis = 0;
+
 //callback notifying us of the need to save config
 void saveConfigCallback () {
   Serial.println("Should save config");
@@ -367,6 +369,25 @@ void setup()
 
     // OTA will fail with HW timers enabled
     ISR_Timer.disableAll();
+  });
+
+  ElegantOTA.onProgress([](size_t current, size_t final)
+  {
+    // Log every 1 second
+    if (millis() - ota_progress_millis > 1000) {
+      ota_progress_millis = millis();
+      Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
+    }
+  });
+
+  ElegantOTA.onEnd([](bool success)
+  {
+    // Log when OTA has finished
+    if (success) {
+      Serial.println("OTA update finished successfully!");
+    } else {
+      Serial.println("There was an error during OTA update!");
+    }
   });
 
   ArduinoOTA.begin();
