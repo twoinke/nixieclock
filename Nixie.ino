@@ -47,8 +47,8 @@ WiFiManager wifiManager;
 
 ESP8266WebServer server(80);
 int8_t tubes[4];
-int8_t blink = 0;
-int8_t enabled = 1;
+bool blink = false;
+bool enabled = true;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
