@@ -5,6 +5,7 @@
 #include <ESP8266WebServer.h> 
 
 #include <WiFiManager.h> 
+#include <ElegantOTA.h>
 
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
@@ -107,7 +108,6 @@ void IRAM_ATTR setNixieTube(int8_t tube_nr, int8_t bcdval)
   
   tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
 }
-
 
 void IRAM_ATTR getTime()
 { 
@@ -243,7 +243,7 @@ void setup()
   //end read
 
   writeByte(0);
-  setNixieTube(1, 1);
+  setNixieTube(1, 2);
 
 
 
@@ -261,23 +261,17 @@ void setup()
  
 
 
-  
-
- 
- // delay(1000);
   Serial.print("\n\nNixie NTP Clock\n\n");
   Serial.print("\n\n2018-2024 Thomas Woinke\n\n");
   
   writeByte(0);
-  setNixieTube(2, 1);
+  setNixieTube(2, 3);
 
   
-  //WiFi.persistent(false);
-
   Serial.printf("Connecting to Wifi..");
 
   wifiManager.autoConnect("NixieConfigAP");
-
+  
   strcpy(hostname,    custom_hostname.getValue()); 
   strcpy(ntp_server,  custom_ntp_server.getValue());
   strcpy(timezone,    custom_timezone.getValue());
@@ -307,7 +301,7 @@ void setup()
   }
 
   writeByte(0);
-  setNixieTube(3, 1);
+  setNixieTube(3, 4);
 
   WiFi.hostname(hostname);
 
@@ -326,6 +320,9 @@ void setup()
   }
   
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
+  
+
+  
 
   server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
   server.on("/blink/", handleBlink);
@@ -335,13 +332,27 @@ void setup()
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
+  ElegantOTA.onStart([]() 
+  {
+    Serial.println("OTA update process started.");
+    digitalWrite(D8, 1); // LEDs
+    writeByte(0);
+
+    // OTA will fail with HW timers enabled
+    ISR_Timer.disableAll();
+  });
+
+  ElegantOTA.begin(&server);
   server.begin();                           // Actually start the server
-  Serial.println("HTTP server started");
+  Serial.println("HTTP server started"); 
 }
 
-void loop(void){
+void loop(void)
+{
   server.handleClient();                    // Listen for HTTP requests from clients
+  ElegantOTA.loop();
 }
+
 
 void handleRoot() 
 {
@@ -357,14 +368,15 @@ void handleRoot()
   sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
   
   header = "<html><head><title>Nixieclock</title></head><body>";
-  body   = "<body><h1>Nixieclock</h1>";
+  body   = "<body><h1>Nixieclock OTA</h1>";
   body  += "<p>Hostname:" + String(hostname) + "</p>";
   body  += "<p>The time is:" + String(time) + "</p>";
   body  += "<p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>";
+  body  += "<p><a href=\"/update\">update</a></p>";
+  
   footer = "</body></html>";
 
   resp = header + body + footer;
-  //sprintf(resp.s_str(), "<body><h1>Nixieclock</h1><p>Hostname: %s</p><p>The time is: %02d:%02d:%02d</p></body></html>", hostname, tm.tm_hour, tm.tm_min, tm.tm_sec);
   server.send(200, "text/html", resp);   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }
 
@@ -395,6 +407,7 @@ void handleOn()
 void handleReset()
 {
   wifiManager.resetSettings();
+  ESP.restart();
   server.sendHeader("Location","/");
   server.send(303); 
 }
@@ -403,3 +416,5 @@ void handleReset()
 void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
+
+
