@@ -6,6 +6,7 @@
 
 #include <WiFiManager.h> 
 #include <ElegantOTA.h>
+#include <ArduinoOTA.h>
 
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
@@ -332,9 +333,9 @@ void setup()
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
-  ElegantOTA.onStart([]() 
-  {
-    Serial.println("OTA update process started.");
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("ArduinoOTA update process started.");
     digitalWrite(D8, 1); // LEDs
     writeByte(0);
 
@@ -342,6 +343,33 @@ void setup()
     ISR_Timer.disableAll();
   });
 
+
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ElegantOTA.onStart([]() 
+  {
+    Serial.println("ElegantOTA update process started.");
+    digitalWrite(D8, 1); // LEDs
+    writeByte(0);
+
+    // OTA will fail with HW timers enabled
+    ISR_Timer.disableAll();
+  });
+
+  ArduinoOTA.begin();
   ElegantOTA.begin(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
@@ -351,6 +379,7 @@ void loop(void)
 {
   server.handleClient();                    // Listen for HTTP requests from clients
   ElegantOTA.loop();
+  ArduinoOTA.handle();
 }
 
 
@@ -416,5 +445,3 @@ void handleReset()
 void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
-
-
