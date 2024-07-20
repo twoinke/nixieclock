@@ -338,11 +338,11 @@ void setup()
 
   ArduinoOTA.onStart([]() {
     Serial.println("ArduinoOTA update process started.");
+    // OTA will fail with HW timers enabled
+    ISR_Timer.disableAll();
     digitalWrite(D8, 1); // LEDs
     writeByte(0);
 
-    // OTA will fail with HW timers enabled
-    ISR_Timer.disableAll();
   });
 
 
@@ -364,11 +364,10 @@ void setup()
   ElegantOTA.onStart([]() 
   {
     Serial.println("ElegantOTA update process started.");
-    digitalWrite(D8, 1); // LEDs
-    writeByte(0);
-
     // OTA will fail with HW timers enabled
     ISR_Timer.disableAll();
+    digitalWrite(D8, 1); // LEDs
+    writeByte(0);
   });
 
   ElegantOTA.onProgress([](size_t current, size_t final)
