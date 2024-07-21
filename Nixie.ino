@@ -199,7 +199,7 @@ void setup()
 
   writeByte(0);
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
-
+  // ISR_Timer.setInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   digitalWrite(D8, 0); // LEDs
   writeByte(0);
   setNixieTube(0, 1);
@@ -323,6 +323,7 @@ void setup()
   }
   
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
+  // ISR_Timer.run();
   
 
   
@@ -342,6 +343,16 @@ void setup()
     ISR_Timer.disableAll();
     digitalWrite(D8, 1); // LEDs
     writeByte(0);
+    pinMode(D0, INPUT);  
+    pinMode(D1, INPUT);  
+    pinMode(D2, INPUT);  
+    pinMode(D3, INPUT);  
+    pinMode(D4, INPUT);  
+    pinMode(D5, INPUT);  
+    pinMode(D6, INPUT);  
+    pinMode(D7, INPUT);  
+    pinMode(D8, INPUT); 
+
 
   });
 
@@ -368,6 +379,16 @@ void setup()
     ISR_Timer.disableAll();
     digitalWrite(D8, 1); // LEDs
     writeByte(0);
+    pinMode(D0, INPUT);  
+    pinMode(D1, INPUT);  
+    pinMode(D2, INPUT);  
+    pinMode(D3, INPUT);  
+    pinMode(D4, INPUT);  
+    pinMode(D5, INPUT);  
+    pinMode(D6, INPUT);  
+    pinMode(D7, INPUT);  
+    pinMode(D8, INPUT); 
+
   });
 
   ElegantOTA.onProgress([](size_t current, size_t final)
