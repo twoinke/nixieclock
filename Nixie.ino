@@ -11,7 +11,7 @@
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
-#include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
+// #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
 
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
@@ -27,9 +27,13 @@
 #define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
 
 
-char hostname[32];
-char ntp_server[32];
-char timezone[32];
+struct configStruct {
+  char hostname[32];
+  char ntp_server[32];
+  char timezone[32];
+};
+
+struct configStruct config;
 
 time_t now;
 tm tm;
@@ -207,18 +211,20 @@ void setup()
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  strcpy(ntp_server, MY_NTP_SERVER);
-  strcpy(hostname, MY_HOSTNAME);
-  strcpy(timezone, MY_TZ);
+  strncpy(config.ntp_server, MY_NTP_SERVER, 32);
+  strncpy(config.hostname, MY_HOSTNAME, 32);
+  strncpy(config.timezone, MY_TZ, 32);
 
   Serial.begin(115200);
   Serial.println("mounting FS...");
 
   if (SPIFFS.begin()) {
     Serial.println("mounted file system");
-    if (SPIFFS.exists("/config.json")) {
+    if (SPIFFS.exists("/config.bin")) 
+    {
       //file exists, reading and loading
       Serial.println("reading config file");
+      /*
       File configFile = SPIFFS.open("/config.json", "r");
       if (configFile) {
         Serial.println("opened config file");
@@ -232,12 +238,29 @@ void setup()
         json.printTo(Serial);
         if (json.success()) {
           Serial.println("\nparsed json");
-          strcpy(ntp_server, json["n"]);
-          strcpy(hostname, json["h"]);
-          strcpy(timezone, json["t"]);
+          strncpy(config.ntp_server, json["n"], 32);
+          strncpy(config.hostname, json["h"], 32);
+          strncpy(config.timezone, json["t"], 32);
         } else {
           Serial.println("failed to load json config");
         }
+      }
+      */
+
+
+      File binaryConfigFile = SPIFFS.open("/config.bin", "r");
+      if (binaryConfigFile)
+      {
+        binaryConfigFile.read((byte*) &config ,sizeof(config));
+        binaryConfigFile.close();
+
+        Serial.println(config.hostname);
+        Serial.println(config.ntp_server);
+        Serial.println(config.timezone);  
+      }
+      else
+      {
+        Serial.println("Could not open config file");
       }
     }
   } else {
@@ -252,9 +275,9 @@ void setup()
 
   
   
-  WiFiManagerParameter custom_hostname("hostname", "Hostname", hostname, 32);
-  WiFiManagerParameter custom_ntp_server("ntp_server", "NTP Server", ntp_server, 32);
-  WiFiManagerParameter custom_timezone("timezone", "Time Zone", timezone, 32);
+  WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, 32);
+  WiFiManagerParameter custom_ntp_server("ntp_server", "NTP Server", config.ntp_server, 32);
+  WiFiManagerParameter custom_timezone("timezone", "Time Zone", config.timezone, 32);
   
 
   wifiManager.addParameter(&custom_hostname);
@@ -275,20 +298,24 @@ void setup()
 
   wifiManager.autoConnect("NixieConfigAP");
   
-  strcpy(hostname,    custom_hostname.getValue()); 
-  strcpy(ntp_server,  custom_ntp_server.getValue());
-  strcpy(timezone,    custom_timezone.getValue());
+  strncpy(config.hostname,    custom_hostname.getValue(), 32); 
+  strncpy(config.ntp_server,  custom_ntp_server.getValue(), 32);
+  strncpy(config.timezone,    custom_timezone.getValue(), 32);
 
   
 
    //save the custom parameters to FS
   if (shouldSaveConfig) {
     Serial.println("saving config");
+    
+  /*
+
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
-    json["n"] = ntp_server;
-    json["h"] = hostname;
-    json["t"] = timezone;
+
+    json["n"] = config.ntp_server;
+    json["h"] = config.hostname;
+    json["t"] = config.timezone;
     
     
 
@@ -297,19 +324,34 @@ void setup()
       Serial.println("failed to open config file for writing");
     }
 
+    
+
     json.printTo(Serial);
     json.printTo(configFile);
     configFile.close();
+  */
+    
+    File binaryConfigFile = SPIFFS.open("/config.bin", "w");
+    if (binaryConfigFile) 
+    {
+      binaryConfigFile.write((byte*) &config ,sizeof(config));
+      binaryConfigFile.close();
+    }
+    else
+    {
+      Serial.println("failed to open config file for writing");
+    }
+
     //end save
   }
 
   writeByte(0);
   setNixieTube(3, 4);
 
-  WiFi.hostname(hostname);
+  WiFi.hostname(config.hostname);
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
-  configTime(timezone, ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
+  configTime(config.timezone, config.ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
   Serial.println();
 
@@ -317,7 +359,7 @@ void setup()
   Serial.println(WiFi.localIP());
 
 
-  if (!MDNS.begin(hostname))
+  if (!MDNS.begin(config.hostname))
   {
     Serial.println("Error setting up mDNS responder");  
   }
@@ -439,7 +481,7 @@ void handleRoot()
   
   header = "<html><head><title>Nixieclock</title></head><body>";
   body   = "<body><h1>Nixieclock OTA</h1>";
-  body  += "<p>Hostname:" + String(hostname) + "</p>";
+  body  += "<p>Hostname:" + String(config.hostname) + "</p>";
   body  += "<p>The time is:" + String(time) + "</p>";
   body  += "<p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>";
   body  += "<p><a href=\"/update\">update</a></p>";
