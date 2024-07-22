@@ -6,16 +6,15 @@
 
 #include <WiFiManager.h> 
 #include <ElegantOTA.h>
-#include <ArduinoOTA.h>
 
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
-// #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
 
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
 
+// default config values
 #define MY_HOSTNAME   "nixieclock"
 #define MY_NTP_SERVER "de.pool.ntp.org"  
 #define MY_TZ         "CET-1CEST,M3.5.0/02,M10.5.0/03"  
@@ -26,6 +25,8 @@
 #define USING_TIM_DIV16               false           // for medium time and medium accurate timer
 #define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
 
+#define HW_TIMER_INTERVAL_MS         5L
+#define TIMER_INTERVAL_1S            1000L
 
 struct configStruct {
   char hostname[32];
@@ -37,6 +38,9 @@ struct configStruct config;
 
 time_t now;
 tm tm;
+int8_t tubes[4];
+bool blink = false;
+bool enabled = true;
 
 // Init ESP8266 timer 1
 ESP8266Timer ITimer;
@@ -46,13 +50,7 @@ ESP8266_ISR_Timer ISR_Timer;
 
 WiFiManager wifiManager;
 
-#define HW_TIMER_INTERVAL_MS         5L
-#define TIMER_INTERVAL_1S            1000L
-
 ESP8266WebServer server(80);
-int8_t tubes[4];
-bool blink = false;
-bool enabled = true;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -63,7 +61,6 @@ uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 {
   return 24 * 60 * 60 * 1000UL; // 24 hours
 }
-
 
 int8_t IRAM_ATTR dec_to_bcd(int8_t dec)
 {
@@ -378,42 +375,6 @@ void setup()
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("ArduinoOTA update process started.");
-    // OTA will fail with HW timers enabled
-    ISR_Timer.disableAll();
-    digitalWrite(D8, 1); // LEDs
-    writeByte(0);
-    pinMode(D0, INPUT);  
-    pinMode(D1, INPUT);  
-    pinMode(D2, INPUT);  
-    pinMode(D3, INPUT);  
-    pinMode(D4, INPUT);  
-    pinMode(D5, INPUT);  
-    pinMode(D6, INPUT);  
-    pinMode(D7, INPUT);  
-    pinMode(D8, INPUT); 
-
-
-  });
-
-
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-
   ElegantOTA.onStart([]() 
   {
     Serial.println("ElegantOTA update process started.");
@@ -452,7 +413,6 @@ void setup()
     }
   });
 
-  ArduinoOTA.begin();
   ElegantOTA.begin(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
@@ -462,7 +422,6 @@ void loop(void)
 {
   server.handleClient();                    // Listen for HTTP requests from clients
   ElegantOTA.loop();
-  ArduinoOTA.handle();
 }
 
 
