@@ -14,6 +14,11 @@
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
 
+
+// config filename
+
+#define CONFIGFILE "/config.bin"
+
 // default config values
 #define MY_HOSTNAME   "nixieclock"
 #define MY_NTP_SERVER "de.pool.ntp.org"  
@@ -25,8 +30,18 @@
 #define USING_TIM_DIV16               false           // for medium time and medium accurate timer
 #define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
 
-#define HW_TIMER_INTERVAL_MS         5L
+#define HW_TIMER_INTERVAL_MS         3L
 #define TIMER_INTERVAL_1S            1000L
+
+const char homepage[] PROGMEM = 
+"<html><head><title>Nixieclock</title></head><body>"
+"  <body><h1>Nixieclock</h1>"
+"  <p>This is a test</p>"
+"  <p><form><button onClick=\"alert(\"Klickediklick! \"):\">Click me!</button></form></p>"
+"  <p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>"
+"  <p><a href=\"/update\">update</a></p>"
+"  </body></html>";
+
 
 struct configStruct {
   char hostname[32];
@@ -39,6 +54,7 @@ struct configStruct config;
 time_t now;
 tm tm;
 int8_t tubes[4];
+bool leds_on = true;
 bool blink = false;
 bool enabled = true;
 
@@ -59,12 +75,13 @@ void time_is_set(bool from_sntp /* <= this optional parameter can be used with E
 
 uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 {
+  Serial.println("sntp update delay dingens called");
   return 24 * 60 * 60 * 1000UL; // 24 hours
 }
 
 int8_t IRAM_ATTR dec_to_bcd(int8_t dec)
 {
-  int8_t result;
+  int8_t result=0;
   
   result |= (dec / 10) << 4;
   result |= (dec % 10) << 0;
@@ -186,6 +203,53 @@ void saveConfigCallback () {
   shouldSaveConfig = true;
 }
 
+
+
+bool loadConfig(const char *filename)
+{
+
+  Serial.println("mounted file system");
+  
+  if (! SPIFFS.exists(filename))
+  {
+    Serial.println("Config file not found");
+
+    return false; 
+  } 
+    
+ 
+  File binaryConfigFile = SPIFFS.open(filename, "r");
+  if (! binaryConfigFile)
+  {
+    Serial.println("Could not open config file");
+    
+    return false;
+  }
+
+  binaryConfigFile.read((byte*) &config ,sizeof(config));
+  binaryConfigFile.close();
+
+  return true;
+}
+
+bool saveConfig(const char * filename)
+{   
+    File binaryConfigFile = SPIFFS.open(filename, "w");
+    if (! binaryConfigFile) 
+    {
+      Serial.println("Could not open config file for writing");
+    
+      return false;
+    }
+
+    binaryConfigFile.write((byte*) &config ,sizeof(config));
+    binaryConfigFile.close();
+    
+    return true;
+}
+
+
+
 void setup() 
 {   
   pinMode(D0, OUTPUT);  
@@ -201,96 +265,54 @@ void setup()
   writeByte(0);
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
   // ISR_Timer.setInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
-  digitalWrite(D8, 0); // LEDs
+  digitalWrite(D8, leds_on); // LEDs
   writeByte(0);
   setNixieTube(0, 1);
   
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
+
+  // init config struct with default values
   strncpy(config.ntp_server, MY_NTP_SERVER, 32);
   strncpy(config.hostname, MY_HOSTNAME, 32);
   strncpy(config.timezone, MY_TZ, 32);
 
   Serial.begin(115200);
+
+  Serial.println();
+  Serial.println("Nixie NTP Clock");
+  Serial.println("2018-2024 Thomas Woinke");
+
+
   Serial.println("mounting FS...");
-
-  if (SPIFFS.begin()) {
-    Serial.println("mounted file system");
-    if (SPIFFS.exists("/config.bin")) 
+  // SPIFFS.format();
+  if (SPIFFS.begin())
+  {
+    if (!loadConfig(CONFIGFILE))
     {
-      //file exists, reading and loading
-      Serial.println("reading config file");
-      /*
-      File configFile = SPIFFS.open("/config.json", "r");
-      if (configFile) {
-        Serial.println("opened config file");
-        size_t size = configFile.size();
-        // Allocate a buffer to store contents of the file.
-        std::unique_ptr<char[]> buf(new char[size]);
-
-        configFile.readBytes(buf.get(), size);
-        DynamicJsonBuffer jsonBuffer;
-        JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
-        if (json.success()) {
-          Serial.println("\nparsed json");
-          strncpy(config.ntp_server, json["n"], 32);
-          strncpy(config.hostname, json["h"], 32);
-          strncpy(config.timezone, json["t"], 32);
-        } else {
-          Serial.println("failed to load json config");
-        }
-      }
-      */
-
-
-      File binaryConfigFile = SPIFFS.open("/config.bin", "r");
-      if (binaryConfigFile)
-      {
-        binaryConfigFile.read((byte*) &config ,sizeof(config));
-        binaryConfigFile.close();
-
-        Serial.println(config.hostname);
-        Serial.println(config.ntp_server);
-        Serial.println(config.timezone);  
-      }
-      else
-      {
-        Serial.println("Could not open config file");
-      }
+      Serial.println("Error loading config");
     }
-  } else {
+    Serial.printf("Config loaded:\nHostname: %s\nNTP Server: %s\nTimezone: %s\n", config.hostname, config.ntp_server, config.timezone);
+  }
+  else
+  {
     Serial.println("failed to mount FS");
   }
-  //end read
 
+  
   writeByte(0);
   setNixieTube(1, 2);
 
-
-
-  
-  
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, 32);
   WiFiManagerParameter custom_ntp_server("ntp_server", "NTP Server", config.ntp_server, 32);
-  WiFiManagerParameter custom_timezone("timezone", "Time Zone", config.timezone, 32);
-  
+  WiFiManagerParameter custom_timezone("timezone", "Time Zone", config.timezone, 32);  
 
   wifiManager.addParameter(&custom_hostname);
   wifiManager.addParameter(&custom_ntp_server);
   wifiManager.addParameter(&custom_timezone);
   
  
-
-
-  Serial.print("\n\nNixie NTP Clock\n\n");
-  Serial.print("\n\n2018-2024 Thomas Woinke\n\n");
-  
-  writeByte(0);
-  setNixieTube(2, 3);
-
-  
   Serial.printf("Connecting to Wifi..");
 
   wifiManager.autoConnect("NixieConfigAP");
@@ -298,61 +320,38 @@ void setup()
   strncpy(config.hostname,    custom_hostname.getValue(), 32); 
   strncpy(config.ntp_server,  custom_ntp_server.getValue(), 32);
   strncpy(config.timezone,    custom_timezone.getValue(), 32);
-
   
+  writeByte(0);
+  setNixieTube(2, 3);
 
    //save the custom parameters to FS
-  if (shouldSaveConfig) {
+  if (shouldSaveConfig) 
+  {
     Serial.println("saving config");
-    
-  /*
-
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
-
-    json["n"] = config.ntp_server;
-    json["h"] = config.hostname;
-    json["t"] = config.timezone;
-    
-    
-
-    File configFile = SPIFFS.open("/config.json", "w");
-    if (!configFile) {
-      Serial.println("failed to open config file for writing");
-    }
-
-    
-
-    json.printTo(Serial);
-    json.printTo(configFile);
-    configFile.close();
-  */
-    
-    File binaryConfigFile = SPIFFS.open("/config.bin", "w");
-    if (binaryConfigFile) 
+    if (! saveConfig(CONFIGFILE))
     {
-      binaryConfigFile.write((byte*) &config ,sizeof(config));
-      binaryConfigFile.close();
-    }
-    else
-    {
-      Serial.println("failed to open config file for writing");
-    }
-
-    //end save
+      Serial.println("Error saving config");
+    }    
   }
 
   writeByte(0);
   setNixieTube(3, 4);
+
+
+/*
+  setNixieTube(0, 8);  
+  setNixieTube(1, 8);  
+  setNixieTube(2, 8);
+  setNixieTube(3, 8);
+*/
 
   WiFi.hostname(config.hostname);
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(config.timezone, config.ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
-  Serial.println();
-
-  Serial.print("Connected, IP address: ");
+  
+  Serial.println("Connected, IP address: ");
   Serial.println(WiFi.localIP());
 
 
@@ -362,10 +361,6 @@ void setup()
   }
   
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
-  // ISR_Timer.run();
-  
-
-  
 
   server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
   server.on("/blink/", handleBlink);
@@ -380,7 +375,7 @@ void setup()
     Serial.println("ElegantOTA update process started.");
     // OTA will fail with HW timers enabled
     ISR_Timer.disableAll();
-    digitalWrite(D8, 1); // LEDs
+   
     writeByte(0);
     pinMode(D0, INPUT);  
     pinMode(D1, INPUT);  
@@ -427,28 +422,30 @@ void loop(void)
 
 void handleRoot() 
 {
-  String header;
-  String body;
-  String footer;
-  String resp;
-  time(&now);
-  localtime_r(&now, &tm);
-  char time[11];
-
-
-  sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
   
+  // String header;
+  // String body;
+  // String footer;
+  // String resp;
+  // time(&now);
+  // localtime_r(&now, &tm);
+  // char time[11];
+
+
+  // sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+  
+  /*
   header = "<html><head><title>Nixieclock</title></head><body>";
   body   = "<body><h1>Nixieclock OTA</h1>";
   body  += "<p>Hostname:" + String(config.hostname) + "</p>";
   body  += "<p>The time is:" + String(time) + "</p>";
   body  += "<p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>";
   body  += "<p><a href=\"/update\">update</a></p>";
-  
   footer = "</body></html>";
+  */
 
-  resp = header + body + footer;
-  server.send(200, "text/html", resp);   // Send HTTP status 200 (Ok) and send some text to the browser/client
+  // resp = header + body + footer;
+  server.send(200, "text/html", homepage);   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }
 
 void handleBlink()
@@ -471,6 +468,7 @@ void handleOff()
 void handleOn()
 {
   enabled = 1;
+  digitalWrite(D8, leds_on); // LEDs
   server.sendHeader("Location","/");
   server.send(303);  
 }
