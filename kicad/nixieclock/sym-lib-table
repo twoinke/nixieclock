@@ -1,0 +1,6 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "nixieclock-rescue")(type "Legacy")(uri "${KIPRJMOD}/nixieclock-rescue.lib")(options "")(descr ""))
+  (lib (name "nixieclock")(type "KiCad")(uri "${KIPRJMOD}/lib/nixieclock.kicad_sym")(options "")(descr ""))
+  (lib (name "nixie_adapter")(type "KiCad")(uri "${KIPRJMOD}/lib/nixie_adapter.kicad_sym")(options "")(descr ""))
+)

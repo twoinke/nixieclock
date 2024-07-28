@@ -1,0 +1,53 @@
+*******
+* Spice Model
+* Item: MPSA92
+* Date: 8/25/10
+* Revision History: A
+* ==========================================================
+* This model was developed by: 
+* Central Semiconductor Corp.
+* 145 Adams Avenue
+* Hauppauge, NY 11788
+*
+* These models are subject to change without notice.
+* Users may not directly or indirectly re-sell or 
+* re-distribute this model. This model may not 
+* be modified, or altered without the consent of Central Semiconductor Corp. 
+*
+* For more information on this model contact
+* Central Semiconductor Corp. at:
+* (631) 435-1110 or Engineering@centralsemi.com
+* http://www.centralsemi.com
+* ==========================================================
+*******
+*SRC=MPSA92;MPSA92;BJTs PNP; Si;  300V  0.500A  50.0MHz   CS 
+.MODEL MPSA92 PNP (
++ IS=28.39F
++ BF=127.12
++ VAF=13.033
++ IKF=.1566
++ ISE=103.89E-15
++ NE=1.2763
++ BR=499.50
++ VAR=50
++ IKR=3.5m
++ ISC=1500P
++ NC=2.9970
++ NR=1
++ NF=1
++ RB=11.300
++ RC=778.1m
++ RE=490.00E-6
++ CJE=109.36E-12
++ VJE=1.2027
++ MJE=.36517
++ CJC=22.069E-12
++ VJC=1.5000
++ MJC=.47644
++ TF=5.0525E-9
++ XTF=4.4954
++ XTB=1.5
++ VTF=24.240
++ ITF=.30881
++ TR=4.8693E-6 )
+**********

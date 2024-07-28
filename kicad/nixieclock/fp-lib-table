@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "nixie")(type "Legacy")(uri "/home/dommas/kicad/Eagle-and-KiCAD-Nixie-Libs/nixies-us.mod")(options "")(descr ""))
+  (lib (name "lib")(type "KiCad")(uri "${KIPRJMOD}/lib")(options "")(descr ""))
+)
