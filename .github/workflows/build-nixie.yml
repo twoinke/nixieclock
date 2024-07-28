@@ -28,7 +28,23 @@ jobs:
       - name: Upload sketches report to workflow artifact
         uses: actions/upload-artifact@v3
         with:
-            name: Nixie
-            path: src/Nixie/sketch-report
-      - name: show files
-        run: find . -name "*.bin" -print
+          name: Nixie
+          path: src/Nixie/sketch-report
+   
+  
+  report:
+    needs: build 
+    runs-on: ubuntu-latest
+    permissions:
+        pull-requests: write
+    steps:
+      # This step is needed to get the size data produced by the compile jobs
+      - name: Download sketches reports artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: Nixie
+          path: src/Nixie/sketch-report
+
+      - uses: arduino/report-size-deltas@v1
+        with:
+          sketches-reports-source: src/Nixie/sketch-report
