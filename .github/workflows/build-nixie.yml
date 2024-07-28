@@ -1,0 +1,10 @@
+- uses: arduino/compile-sketches@v1
+  with:
+    fqbn: "esp8266:esp8266:d1_mini_clone"
+    libraries: |
+      - name: NTPCLient
+      - name: Time
+      - name: Timezone
+      - name: ESPEssentials
+      - name: ElegantOTA
+      - name: ESP8266TimerInterrupt 
