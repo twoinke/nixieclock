@@ -22,3 +22,5 @@ jobs:
             - name: ESPEssentials
             - name: ElegantOTA
             - name: ESP8266TimerInterrupt 
+          sketch-paths: |
+            - src/Nixie
