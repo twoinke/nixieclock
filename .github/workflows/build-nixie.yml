@@ -24,3 +24,5 @@ jobs:
             - name: ESP8266TimerInterrupt 
           sketch-paths: |
             - src/Nixie
+        - name: show 
+          run: cd src/Nixie && ls -l
