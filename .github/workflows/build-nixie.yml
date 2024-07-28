@@ -24,5 +24,11 @@ jobs:
             - name: ESP8266TimerInterrupt 
           sketch-paths: |
             - src/Nixie
+          sketches-report-path: src/Nixie/sketch-report
+      - name: Upload sketches report to workflow artifact
+        uses: actions/upload-artifact@v3
+        with:
+            name: Nixie
+            path: src/Nixie/sketch-report
       - name: show files
         run: find . -name "*.bin" -print
