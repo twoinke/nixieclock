@@ -25,6 +25,4 @@ jobs:
           sketch-paths: |
             - src/Nixie
       - name: show files
-        run: ls -l
-      - run: cd src && ls -l
-      - run: cd src/Nixie && ls -l
+        run: find . -name "*.bin" -print
