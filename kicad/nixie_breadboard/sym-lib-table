@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 0)
+  (lib (name "nixie_breadboard-rescue")(type "Legacy")(uri "${KIPRJMOD}/nixie_breadboard-rescue.lib")(options "")(descr ""))
+)
