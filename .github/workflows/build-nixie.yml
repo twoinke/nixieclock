@@ -26,27 +26,9 @@ jobs:
       - name: looki looki
         run: 
           ls -lR .
-  #       - name: build
-  #       uses: arduino/compile-sketches@v1
-  #       with:
-  #         fqbn: "esp8266:esp8266:d1_mini_clone"
-
-  #         platforms: |
-  #           - name: "esp8266:esp8266"
-  #             source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
-  #         libraries: |
-  #           - name: NTPCLient
-  #           - name: Time
-  #           - name: Timezone
-  #           - name: ESPEssentials
-  #           - name: ElegantOTA
-  #           - name: ESP8266TimerInterrupt 
-  #         sketch-paths: |
-  #           - src/Nixie
-  #         sketches-report-path: src/Nixie/sketch-report
-  #     - name: Upload sketches report to workflow artifact
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: Nixie
-  #         path: src/Nixie/sketch-report
-   
+ 
+      - name: Upload sketches report to workflow artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Nixie Binary
+          path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
