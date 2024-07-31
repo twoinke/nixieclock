@@ -19,15 +19,17 @@ jobs:
       - name: Install Libraries
         run: |
           arduino-cli lib install NTPClient
-          arduino-cli lib install Time
-          arduino-cli lib install Timezone
+          arduino-cli lib install Time Timezone
           arduino-cli lib install ESPEssentials
           arduino-cli lib install ElegantOTA
           arduino-cli lib install ESP8266TimerInterrupt
           
           
       - name: Compile Sketch
-        run: arduino-cli compile --fqbn esp8266:esp8266:d1_mini_clone ./src/Nixie
+        run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone ./src/Nixie
+
+      - name: looki looki
+        run: ls -l ./src/Nixie
   #       - name: build
   #       uses: arduino/compile-sketches@v1
   #       with:
