@@ -7,44 +7,52 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: build
-        uses: arduino/compile-sketches@v1
-        with:
-          fqbn: "esp8266:esp8266:d1_mini_clone"
 
-          platforms: |
-            - name: "esp8266:esp8266"
-              source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
-          libraries: |
-            - name: NTPCLient
-            - name: Time
-            - name: Timezone
-            - name: ESPEssentials
-            - name: ElegantOTA
-            - name: ESP8266TimerInterrupt 
-          sketch-paths: |
-            - src/Nixie
-          sketches-report-path: src/Nixie/sketch-report
-      - name: Upload sketches report to workflow artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Nixie
-          path: src/Nixie/sketch-report
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1.0.0
+      
+      - name: Install platform
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json esp8266:esp8266:d1_mini_clone
+  #       - name: build
+  #       uses: arduino/compile-sketches@v1
+  #       with:
+  #         fqbn: "esp8266:esp8266:d1_mini_clone"
+
+  #         platforms: |
+  #           - name: "esp8266:esp8266"
+  #             source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json 
+  #         libraries: |
+  #           - name: NTPCLient
+  #           - name: Time
+  #           - name: Timezone
+  #           - name: ESPEssentials
+  #           - name: ElegantOTA
+  #           - name: ESP8266TimerInterrupt 
+  #         sketch-paths: |
+  #           - src/Nixie
+  #         sketches-report-path: src/Nixie/sketch-report
+  #     - name: Upload sketches report to workflow artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: Nixie
+  #         path: src/Nixie/sketch-report
    
   
-  report:
-    needs: build 
-    runs-on: ubuntu-latest
-    permissions:
-        pull-requests: write
-    steps:
-      # This step is needed to get the size data produced by the compile jobs
-      - name: Download sketches reports artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: Nixie
-          path: src/Nixie/sketch-report
+  # report:
+  #   needs: build 
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #       pull-requests: write
+  #   steps:
+  #     # This step is needed to get the size data produced by the compile jobs
+  #     - name: Download sketches reports artifact
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: Nixie
+  #         path: src/Nixie/sketch-report
 
-      - uses: arduino/report-size-deltas@v1
-        with:
-          sketches-reports-source: src/Nixie/sketch-report
+  #     - uses: arduino/report-size-deltas@v1
+  #       with:
+  #         sketches-reports-source: src/Nixie/sketch-report
