@@ -14,7 +14,7 @@ jobs:
       - name: Install platform
         run: |
           arduino-cli core update-index
-          arduino-cli core install --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json esp8266:esp8266:d1_mini_clone
+          arduino-cli core install esp8266:esp8266:d1_mini_clone --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json 
   #       - name: build
   #       uses: arduino/compile-sketches@v1
   #       with:
