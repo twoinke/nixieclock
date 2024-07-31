@@ -18,20 +18,14 @@ jobs:
 
       - name: Install Libraries
         run: |
-          arduino-cli lib install NTPClient
-          arduino-cli lib install Time Timezone
-          arduino-cli lib install ESPEssentials
-          arduino-cli lib install ElegantOTA
-          arduino-cli lib install ESP8266TimerInterrupt
-          
+          arduino-cli lib install NTPClient@3.2.1 Time@1.6.1 Timezone@1.2.4 ESPEssentials@2.1.4 ElegantOTA@3.1.3 ESP8266TimerInterrupt@1.6.0
           
       - name: Compile Sketch
         run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone ./src/Nixie
 
       - name: looki looki
         run: 
-          ls -l ./src/Nixie
-          ls -l ./src/Nixie/build
+          ls -lR .
   #       - name: build
   #       uses: arduino/compile-sketches@v1
   #       with:
@@ -56,20 +50,3 @@ jobs:
   #         name: Nixie
   #         path: src/Nixie/sketch-report
    
-  
-  # report:
-  #   needs: build 
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #       pull-requests: write
-  #   steps:
-  #     # This step is needed to get the size data produced by the compile jobs
-  #     - name: Download sketches reports artifact
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: Nixie
-  #         path: src/Nixie/sketch-report
-
-  #     - uses: arduino/report-size-deltas@v1
-  #       with:
-  #         sketches-reports-source: src/Nixie/sketch-report
