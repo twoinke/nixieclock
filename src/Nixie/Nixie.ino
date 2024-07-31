@@ -36,7 +36,6 @@
 const char homepage[] PROGMEM = 
 "<html><head><title>Nixieclock</title></head><body>"
 "  <body><h1>Nixieclock</h1>"
-"  <p>This is a test</p>"
 "  <p><form><button onClick=\"alert('Klickediklick!');\">Click me!</button></form></p>"
 "  <p><a href=\"/api?enabled=1/\">on</a> | <a href=\"/api?enabled=0\">off</a>"
 " | <a href=\"/api?blink=1/\">blink on</a> | <a href=\"/api?blink=0/\">blink off</a>"
