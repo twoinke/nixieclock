@@ -37,8 +37,10 @@ const char homepage[] PROGMEM =
 "<html><head><title>Nixieclock</title></head><body>"
 "  <body><h1>Nixieclock</h1>"
 "  <p>This is a test</p>"
-"  <p><form><button onClick=\"alert(\"Klickediklick! \"):\">Click me!</button></form></p>"
-"  <p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>"
+"  <p><form><button onClick=\"alert('Klickediklick!');\">Click me!</button></form></p>"
+"  <p><a href=\"/api?enabled=1/\">on</a> | <a href=\"/api?enabled=0\">off</a>"
+" | <a href=\"/api?blink=1/\">blink on</a> | <a href=\"/api?blink=0/\">blink off</a>"
+" | <a href=\"/api?leds=0/\">LEDs off</a> | <a href=\"/api?leds=1/\">LEDs on</a></p>"
 "  <p><a href=\"/update\">update</a></p>"
 "  </body></html>";
 
@@ -363,10 +365,13 @@ void setup()
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
 
   server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
+  server.on("/api", handleAPI);
+/*
   server.on("/blink/", handleBlink);
   server.on("/off/", handleOff);
   server.on("/on/", handleOn);
   server.on("/reset/", handleReset);
+*/
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
@@ -389,6 +394,16 @@ void setup()
 
   });
 
+  initOTA();
+
+  server.begin();                           // Actually start the server
+  Serial.println("HTTP server started"); 
+
+
+}
+
+void initOTA()
+{
   ElegantOTA.onProgress([](size_t current, size_t final)
   {
     // Log every 1 second
@@ -409,10 +424,8 @@ void setup()
   });
 
   ElegantOTA.begin(&server);
-  server.begin();                           // Actually start the server
-  Serial.println("HTTP server started"); 
-}
 
+}
 void loop(void)
 {
   server.handleClient();                    // Listen for HTTP requests from clients
@@ -447,38 +460,52 @@ void handleRoot()
   // resp = header + body + footer;
   server.send(200, "text/html", homepage);   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }
-
-void handleBlink()
+void handleAPI()
 {
-  blink = !blink;
-  digitalWrite(D8, 0); // LEDs
+  int tmp;
+
+  if (server.hasArg("leds"))
+  {
+    leds_on = server.arg("leds").toInt();   
+    digitalWrite(D8, leds_on); // LEDs
+
+    Serial.printf("LEDs: %d\n", leds_on);
+
+  }
+  else if (server.hasArg("blink"))
+  {
+    blink = server.arg("blink").toInt();
+    Serial.printf("Blink: %d\n", blink);
+  }
+  else if(server.hasArg("enabled"))
+  {
+    tmp = server.arg("enabled").toInt();
+
+    if (tmp == 0)
+    {
+      enabled = 0;
+      digitalWrite(D8, 0); // LEDs
+      writeByte(0);
+      Serial.printf("Enabled: %d\n", enabled);
+    }
+    else
+    {
+      enabled = 1;
+      digitalWrite(D8, leds_on); // LEDs
+      Serial.printf("Enabled: %d\n", enabled);
+    }
+  }
+  else if (server.hasArg("reset"))
+  {
+    if (server.arg("reset").toInt() == 1)
+    {
+      wifiManager.resetSettings();
+      ESP.restart();
+    }
+  }
+
   server.sendHeader("Location","/");
   server.send(303);  
-}
-
-void handleOff()
-{
-  enabled = 0;
-  digitalWrite(D8, 0); // LEDs
-  writeByte(0);
-  server.sendHeader("Location","/");
-  server.send(303);  
-}
-
-void handleOn()
-{
-  enabled = 1;
-  digitalWrite(D8, leds_on); // LEDs
-  server.sendHeader("Location","/");
-  server.send(303);  
-}
-
-void handleReset()
-{
-  wifiManager.resetSettings();
-  ESP.restart();
-  server.sendHeader("Location","/");
-  server.send(303); 
 }
 
 
