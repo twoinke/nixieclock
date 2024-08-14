@@ -7,6 +7,12 @@
 #include <WiFiManager.h> 
 #include <ElegantOTA.h>
 
+
+// Select a Timer Clock
+#define USING_TIM_DIV1                false           // for shortest and most accurate timer
+#define USING_TIM_DIV16               false           // for medium time and medium accurate timer
+#define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
+
 #include "ESP8266TimerInterrupt.h"
 #include "ESP8266_ISR_Timer.h"
 #include <ESP8266_ISR_Timer.hpp>               //https://github.com/khoih-prog/ESP8266TimerInterrupt
@@ -24,13 +30,7 @@
 #define MY_NTP_SERVER "de.pool.ntp.org"  
 #define MY_TZ         "CET-1CEST,M3.5.0/02,M10.5.0/03"  
 
-
-// Select a Timer Clock
-#define USING_TIM_DIV1                false           // for shortest and most accurate timer
-#define USING_TIM_DIV16               false           // for medium time and medium accurate timer
-#define USING_TIM_DIV256              true            // for longest timer but least accurate. Default
-
-#define HW_TIMER_INTERVAL_MS         3L
+#define HW_TIMER_INTERVAL_US         500L
 #define TIMER_INTERVAL_1S            1000L
 
 const char homepage[] PROGMEM = 
@@ -131,18 +131,32 @@ void IRAM_ATTR writeByte(int8_t b)
 void IRAM_ATTR updateNixies()
 {
   static int8_t tube = 4;
+  static bool toggle = true;
 
-  
-  if (! enabled)
+  if (! toggle )
+  {
+    toggle = true;
+    writeByte(0);
+
+    return;
+  }
+
+  if (! enabled )
   {
     return;
   }
 
-  ISR_Timer.run();
-
   if (tube == 0) tube = 4;
 
   writeByte(tubes[--tube]);
+  toggle = false;
+}
+
+void IRAM_ATTR TimerHandler()
+{
+  ISR_Timer.run();
+  
+  updateNixies();
 }
 
 
@@ -290,7 +304,8 @@ void setup()
 
   writeByte(0);
   
-  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
+  ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler);
+  
   
   digitalWrite(D8, leds_on); // LEDs
   writeByte(0);
