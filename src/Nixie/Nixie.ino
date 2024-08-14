@@ -36,10 +36,35 @@
 const char homepage[] PROGMEM = 
 "<html><head><title>Nixieclock</title></head><body>"
 "  <body><h1>Nixieclock</h1>"
-"  <p><form><button onClick=\"alert('Klickediklick!');\">Click me!</button></form></p>"
-"  <p><a href=\"/api?enabled=1/\">on</a> | <a href=\"/api?enabled=0\">off</a>"
-" | <a href=\"/api?blink=1/\">blink on</a> | <a href=\"/api?blink=0/\">blink off</a>"
-" | <a href=\"/api?leds=0/\">LEDs off</a> | <a href=\"/api?leds=1/\">LEDs on</a></p>"
+"  <p><form action=\"/api\" method=\"post\">"
+"  <fieldset><legend>Nixies</legend>"
+"  <input type=\"radio\" name=\"enabled\" value=\"1\" checked /><label>On</label>"
+"  <input type=\"radio\" name=\"enabled\" value=\"0\" /><label>Off</label>"
+"  <input type=\"submit\" value=\"Send\" />"
+"  </fieldset>"
+"  </form></p>"
+
+"  <p><form action=\"/api\" method=\"post\">"
+"  <fieldset><legend>LED blink</legend>"
+"  <input type=\"radio\" name=\"blink\" value=\"1\" checked /><label>On</label>"
+"  <input type=\"radio\" name=\"blink\" value=\"0\" /><label>Off</label>"
+"  <input type=\"submit\" value=\"Send\" />"
+"  </fieldset>"
+"  </form></p>"
+
+"  <p><form action=\"/api\" method=\"post\">"
+"  <fieldset><legend>LED on/off</legend>"
+"  <input type=\"radio\" name=\"leds\" value=\"1\" checked /><label>On</label>"
+"  <input type=\"radio\" name=\"leds\" value=\"0\" /><label>Off</label>"
+"  <input type=\"submit\" value=\"Send\" />"
+"  </fieldset>"
+"  </form></p>"
+
+"  <p><form action=\"api\" method=\"get\" onSubmit=\"return confirm('Sicher? WLAN Zugangsdaten werden gel&ouml;scht!');\" ><fieldset><legend>Reset</legend>"
+"  <input type=\"submit\" value=\"Reset\"/>"
+"  <input type=\"hidden\" name=\"reset\" value=\"1\" />"
+"  </fieldset>"
+"  </form></p>"
 "  <p><a href=\"/update\">update</a></p>"
 "  </body></html>";
 
@@ -264,15 +289,14 @@ void setup()
   pinMode(D8, OUTPUT); 
 
   writeByte(0);
+  
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
-  // ISR_Timer.setInterval(HW_TIMER_INTERVAL_MS * 1000, updateNixies);
+  
   digitalWrite(D8, leds_on); // LEDs
   writeByte(0);
   setNixieTube(0, 1);
   
-
   wifiManager.setSaveConfigCallback(saveConfigCallback);
-
 
   // init config struct with default values
   strncpy(config.ntp_server, MY_NTP_SERVER, 32);
@@ -339,13 +363,6 @@ void setup()
   setNixieTube(3, 4);
 
 
-/*
-  setNixieTube(0, 8);  
-  setNixieTube(1, 8);  
-  setNixieTube(2, 8);
-  setNixieTube(3, 8);
-*/
-
   WiFi.hostname(config.hostname);
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
@@ -365,14 +382,20 @@ void setup()
 
   server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
   server.on("/api", handleAPI);
-/*
-  server.on("/blink/", handleBlink);
-  server.on("/off/", handleOff);
-  server.on("/on/", handleOn);
-  server.on("/reset/", handleReset);
-*/
   
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
+
+
+  initOTA();
+
+  server.begin();                           // Actually start the server
+  Serial.println("HTTP server started"); 
+
+
+}
+
+void initOTA()
+{
 
   ElegantOTA.onStart([]() 
   {
@@ -393,16 +416,6 @@ void setup()
 
   });
 
-  initOTA();
-
-  server.begin();                           // Actually start the server
-  Serial.println("HTTP server started"); 
-
-
-}
-
-void initOTA()
-{
   ElegantOTA.onProgress([](size_t current, size_t final)
   {
     // Log every 1 second
@@ -433,32 +446,10 @@ void loop(void)
 
 
 void handleRoot() 
-{
-  
-  // String header;
-  // String body;
-  // String footer;
-  // String resp;
-  // time(&now);
-  // localtime_r(&now, &tm);
-  // char time[11];
-
-
-  // sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
-  
-  /*
-  header = "<html><head><title>Nixieclock</title></head><body>";
-  body   = "<body><h1>Nixieclock OTA</h1>";
-  body  += "<p>Hostname:" + String(config.hostname) + "</p>";
-  body  += "<p>The time is:" + String(time) + "</p>";
-  body  += "<p><a href=\"/on/\">on</a>|<a href=\"/off/\">off</a>|<a href=\"/blink/\">blink</a></p>";
-  body  += "<p><a href=\"/update\">update</a></p>";
-  footer = "</body></html>";
-  */
-
-  // resp = header + body + footer;
+{  
   server.send(200, "text/html", homepage);   // Send HTTP status 200 (Ok) and send some text to the browser/client
 }
+
 void handleAPI()
 {
   int tmp;
