@@ -338,7 +338,7 @@ void setup()
   }
   else
   {
-    Serial.println("failed to mount FS");
+    Serial.println("failed to mount FS. Attempting to format.");
   }
 
   
