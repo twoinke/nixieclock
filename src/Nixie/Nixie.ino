@@ -1,4 +1,5 @@
 
+#define FORMAT_SPIFFS_IF_FAILED true
 #include <FS.h> //this needs to be first, or it all crashes and burns...
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
@@ -326,8 +327,8 @@ void setup()
 
 
   Serial.println("mounting FS...");
-  // SPIFFS.format();
-  if (SPIFFS.begin())
+
+  if (SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED))
   {
     if (!loadConfig(CONFIGFILE))
     {
