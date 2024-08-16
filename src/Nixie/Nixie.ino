@@ -180,7 +180,7 @@ void IRAM_ATTR getTime()
   time(&now);
   localtime_r(&now, &tm);
 
-  if (led_mode = LEDS_BLINK)
+  if (led_mode == LEDS_BLINK)
   {
     digitalWrite(D8, !digitalRead(D8)); 
   }
