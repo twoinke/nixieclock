@@ -516,6 +516,7 @@ void handleAPI()
   {
     if (server.arg("reset").toInt() == 1)
     {
+      ISR_Timer.disableAll();
       wifiManager.resetSettings();
       ESP.restart();
     }
