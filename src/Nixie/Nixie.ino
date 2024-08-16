@@ -1,5 +1,4 @@
 
-#define FORMAT_SPIFFS_IF_FAILED true
 #include <FS.h> //this needs to be first, or it all crashes and burns...
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
@@ -24,12 +23,15 @@
 
 // config filename
 
-#define CONFIGFILE "/config.bin"
+#define CONFIGFILE                   "/config.bin"
 
 // default config values
-#define MY_HOSTNAME   "nixieclock"
-#define MY_NTP_SERVER "de.pool.ntp.org"  
-#define MY_TZ         "CET-1CEST,M3.5.0/02,M10.5.0/03"  
+#define MY_HOSTNAME                  "nixieclock"
+#define MY_NTP_SERVER                "de.pool.ntp.org"  
+#define MY_TZ                        "CET-1CEST,M3.5.0/02,M10.5.0/03"  
+
+#define SERIAL_BAUDRATE              115200
+#define WEBSERVER_PORT               80
 
 #define HW_TIMER_INTERVAL_US         500L
 #define TIMER_INTERVAL_1S            1000L
@@ -93,7 +95,7 @@ ESP8266_ISR_Timer ISR_Timer;
 
 WiFiManager wifiManager;
 
-ESP8266WebServer server(80);
+ESP8266WebServer server(WEBSERVER_PORT);
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -173,7 +175,6 @@ void IRAM_ATTR getTime()
 { 
   static int8_t cnt = 0;
   static int8_t tmp = 0;
-
   
   time(&now);
   localtime_r(&now, &tm);
@@ -183,7 +184,7 @@ void IRAM_ATTR getTime()
     digitalWrite(D8, !digitalRead(D8)); 
   }
  
-/*
+#ifdef DEBUG
   Serial.print("year:");
   Serial.print(tm.tm_year + 1900);  // years since 1900
   Serial.print("\tmonth:");
@@ -203,7 +204,8 @@ void IRAM_ATTR getTime()
   else
     Serial.print("\tstandard");
   Serial.println();
-*/
+#endif
+
   // screensaver :-)
  
   if (tm.tm_hour == 0 && tm.tm_min >= 0 && tm.tm_min <= 5)
@@ -229,8 +231,10 @@ void IRAM_ATTR getTime()
   tmp = dec_to_bcd((int8_t)tm.tm_hour);
   setNixieTube(1, 0x0f & tmp);
   setNixieTube(0, (tmp >> 4));
- 
-  //Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
+
+#ifdef DEBUG
+  Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
+#endif
 }
 
 //flag for saving data
@@ -319,7 +323,7 @@ void setup()
   strncpy(config.hostname, MY_HOSTNAME, 32);
   strncpy(config.timezone, MY_TZ, 32);
 
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUDRATE);
 
   Serial.println();
   Serial.println("Nixie NTP Clock");
@@ -328,7 +332,7 @@ void setup()
 
   Serial.println("mounting FS...");
 
-  if (SPIFFS.begin(FORMAT_SPIFFS_IF_FAILED))
+  if (SPIFFS.begin())
   {
     if (!loadConfig(CONFIGFILE))
     {
@@ -339,6 +343,7 @@ void setup()
   else
   {
     Serial.println("failed to mount FS. Attempting to format.");
+    SPIFFS.format();
   }
 
   
