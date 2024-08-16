@@ -82,7 +82,8 @@ struct configStruct config;
 
 time_t now;
 tm tm;
-int8_t tubes[4];
+uint8_t tubes[4];
+
 bool leds_on = true;
 bool blink = false;
 bool enabled = true;
