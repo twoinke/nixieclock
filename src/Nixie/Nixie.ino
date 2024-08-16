@@ -36,6 +36,10 @@
 #define HW_TIMER_INTERVAL_US         500L
 #define TIMER_INTERVAL_1S            1000L
 
+#define LEDS_OFF    0
+#define LEDS_ON     1
+#define LEDS_BLINK  2
+
 const char homepage[] PROGMEM = 
 "<html><head><title>Nixieclock</title></head><body>"
 "  <body><h1>Nixieclock</h1>"
@@ -48,17 +52,10 @@ const char homepage[] PROGMEM =
 "  </form></p>"
 
 "  <p><form action=\"/api\" method=\"post\">"
-"  <fieldset><legend>LED blink</legend>"
-"  <input type=\"radio\" name=\"blink\" value=\"1\" checked /><label>On</label>"
-"  <input type=\"radio\" name=\"blink\" value=\"0\" /><label>Off</label>"
-"  <input type=\"submit\" value=\"Send\" />"
-"  </fieldset>"
-"  </form></p>"
-
-"  <p><form action=\"/api\" method=\"post\">"
-"  <fieldset><legend>LED on/off</legend>"
-"  <input type=\"radio\" name=\"leds\" value=\"1\" checked /><label>On</label>"
-"  <input type=\"radio\" name=\"leds\" value=\"0\" /><label>Off</label>"
+"  <fieldset><legend>LED mode</legend>"
+"  <input type=\"radio\" name=\"led_mode\" value=\"0\" /><label>off</label>"
+"  <input type=\"radio\" name=\"led_mode\" value=\"1\" checked /><label>on</label>"
+"  <input type=\"radio\" name=\"led_mode\" value=\"2\" checked /><label>blink</label>"
 "  <input type=\"submit\" value=\"Send\" />"
 "  </fieldset>"
 "  </form></p>"
@@ -70,6 +67,7 @@ const char homepage[] PROGMEM =
 "  </form></p>"
 "  <p><a href=\"/update\">update</a></p>"
 "  </body></html>";
+
 
 
 struct configStruct {
@@ -84,8 +82,10 @@ time_t now;
 tm tm;
 uint8_t tubes[4];
 
-bool leds_on = true;
-bool blink = false;
+uint8_t led_mode = LEDS_ON;
+
+// bool leds_on = true;
+// bool blink = false;
 bool enabled = true;
 
 // Init ESP8266 timer 1
@@ -180,7 +180,7 @@ void IRAM_ATTR getTime()
   time(&now);
   localtime_r(&now, &tm);
 
-  if (blink)
+  if (led_mode = LEDS_BLINK)
   {
     digitalWrite(D8, !digitalRead(D8)); 
   }
@@ -312,8 +312,10 @@ void setup()
   
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler);
   
-  
-  digitalWrite(D8, leds_on); // LEDs
+  if (led_mode == LEDS_ON)
+  {
+    digitalWrite(D8, true); // LEDs
+  }
   writeByte(0);
   setNixieTube(0, 1);
   
@@ -476,18 +478,23 @@ void handleAPI()
 {
   int tmp;
 
-  if (server.hasArg("leds"))
+  if (server.hasArg("led_mode"))
   {
-    leds_on = server.arg("leds").toInt();   
-    digitalWrite(D8, leds_on); // LEDs
+    led_mode = server.arg("led_mode").toInt();
+    if (led_mode >= 0 && led_mode <=2)
+    {
+      if (led_mode > 0)
+      {
+        digitalWrite(D8, true); // LEDs
+      }
+      else
+      {
+        digitalWrite(D8, false); // LEDs
+      }
 
-    Serial.printf("LEDs: %d\n", leds_on);
+      Serial.printf("LEDs: %d\n", led_mode);
+    }   
 
-  }
-  else if (server.hasArg("blink"))
-  {
-    blink = server.arg("blink").toInt();
-    Serial.printf("Blink: %d\n", blink);
   }
   else if(server.hasArg("enabled"))
   {
@@ -496,14 +503,12 @@ void handleAPI()
     if (tmp == 0)
     {
       enabled = 0;
-      digitalWrite(D8, 0); // LEDs
       writeByte(0);
       Serial.printf("Enabled: %d\n", enabled);
     }
     else
     {
       enabled = 1;
-      digitalWrite(D8, leds_on); // LEDs
       Serial.printf("Enabled: %d\n", enabled);
     }
   }
