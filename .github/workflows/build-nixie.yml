@@ -35,7 +35,21 @@ jobs:
         with:
           name: nixie-binary
           path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
+  
+  release:
+    needs: build
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nixie-binary
+          path: ./  # Where to download the artifact
+          
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
@@ -46,4 +60,4 @@ jobs:
           draft: false
           prerelease: false
           artifacts: |
-            src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin  
+            Nixie.ino.bin  
