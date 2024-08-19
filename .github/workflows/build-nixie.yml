@@ -55,6 +55,6 @@ jobs:
           body: Automatically generated release ${{ github.run_number }}
           draft: false
           prerelease: false
-          files: |
+          artifacts: |
             Nixie.ino.bin    
       
