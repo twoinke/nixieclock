@@ -30,7 +30,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nixie Binary
+          name: nixie-binary
           path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
   release:
     needs: build
@@ -43,7 +43,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v2
         with:
-          name: Nixie Binary
+          name: nixie-binary
           path: ./  
 
       - name: Create Release
