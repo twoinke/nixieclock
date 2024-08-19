@@ -66,7 +66,7 @@ const char homepage[] PROGMEM =
 "  </fieldset>"
 "  </form></p>"
 "  <p><a href=\"/update\">update</a></p>"
-"  </body></html>";
+"</body></html>";
 
 
 
