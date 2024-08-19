@@ -80,7 +80,7 @@ struct configStruct config;
 
 time_t now;
 tm tm;
-uint8_t tubes[4];
+volatile uint8_t tubes[4];
 
 uint8_t led_mode = LEDS_ON;
 
