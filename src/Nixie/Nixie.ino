@@ -74,6 +74,13 @@ const char homepage[] PROGMEM =
 "  <input type=\"hidden\" name=\"reset\" value=\"1\" />"
 "  </fieldset>"
 "  </form></p>"
+
+"  <p><form action=\"api\" method=\"get\" onSubmit=\"return confirm('Sicher?');\" ><fieldset><legend>Update</legend>"
+"  <input type=\"submit\" value=\"Update\"/>"
+"  <input type=\"hidden\" name=\"update\" value=\"1\" />"
+"  </fieldset>"
+"  </form></p>"
+
 "  <p><a href=\"/update\">update</a></p>"
 "</body></html>";
 
@@ -428,15 +435,6 @@ void setup()
 
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
-
-
-  updateFromGithub();
-
-  if (updateURL.length() > 0)
-  {
-    doUpdate();
-  }
-
   
 }
 
@@ -680,6 +678,16 @@ void handleAPI()
       wifiManager.resetSettings();
       ESP.restart();
     }
+  }
+  else if (server.hasArg("update"))
+  {
+      updateFromGithub();
+
+      if (updateURL.length() > 0)
+      {
+        doUpdate();
+      }
+
   }
 
   server.sendHeader("Location","/");
