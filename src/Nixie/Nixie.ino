@@ -1,14 +1,17 @@
+
 #include <FS.h>
 
 #define UPDATE_URL "https://api.github.com/repos/twoinke/nixieclock/releases/latest"
 #define UPDATE_BINFILE "Nixie.ino.bin"
 
-#include <CertStoreBearSSL.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h> 
 #include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPClient.h>
 #include <WiFiManager.h> 
+#include <WiFiClientSecure.h>
+
 #include <ElegantOTA.h>
 #include <ArduinoJson.h>
 
@@ -106,8 +109,6 @@ ESP8266_ISR_Timer ISR_Timer;
 WiFiManager wifiManager;
 
 ESP8266WebServer server(WEBSERVER_PORT);
-
-BearSSL::CertStore certStore;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -429,10 +430,7 @@ void setup()
   Serial.println("HTTP server started"); 
 
 
-  // updateFromGithub();
-
-
-  updateURL = "https://objects.githubusercontent.com/github-production-release-asset-2e65be/834742031/9a15a585-bf10-401d-910f-300136d4ffdc?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20240820%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240820T203921Z&X-Amz-Expires=300&X-Amz-Signature=76818a3af0ba1880a1d267427335b9b76fb8aa1823eef04c8ff17e5a67cbcd7e&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=834742031&response-content-disposition=attachment%3B%20filename%3DNixie.ino.bin&response-content-type=application%2Foctet-stream";
+  updateFromGithub();
 
   if (updateURL.length() > 0)
   {
@@ -447,15 +445,12 @@ void setup()
 void updateFromGithub() 
 {
   JsonDocument doc;
-  BearSSL::WiFiClientSecure client;
-  int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
-  Serial.printf("num certs: %d\n", numCerts);
+  WiFiClientSecure client;
 
-  client.setCertStore(&certStore);
-
+  client.setInsecure();
   if (!client.connect("api.github.com", 443)) 
   {
-    Serial.println("Connection failed");
+    Serial.println("Connection to api.github.com failed");
     return;
   }
   Serial.println("Connection established");
@@ -512,6 +507,13 @@ void updateFromGithub()
         updateURL = asset_url;
 
         Serial.println("Update URL:" + updateURL);
+        strncpy(config.release_tag, release_tag, 4);
+
+        if (! saveConfig(CONFIGFILE))
+        {
+          Serial.println("Error saving config");
+        }  
+
         return;
       }
     }
@@ -534,20 +536,36 @@ void doUpdate()
     pinMode(D8, INPUT); 
 
 
-    BearSSL::WiFiClientSecure updateClient;
-    bool mfln = updateClient.probeMaxFragmentLength("api.github.com", 443, 1024);
-    if (mfln) {
-        updateClient.setBufferSizes(1024, 1024);
-    }
-    updateClient.setCertStore(&certStore);
+    WiFiClientSecure updateClient;
+    updateClient.setInsecure();
+
+
+
+    // bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
+    // if (mfln) 
+    // {
+      // updateClient.setBufferSizes(1024, 1024);
+    // }
 
     ESPhttpUpdate.setLedPin(D4, LOW);
+    ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    Serial.println("Updating from " + updateURL);
+
+
+
     t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, updateURL);
 
     switch (ret) 
     {
       case HTTP_UPDATE_FAILED:
           Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
+          strncpy(config.release_tag, RELEASE_TAG, 4);
+
+          if (! saveConfig(CONFIGFILE))
+          {
+            Serial.println("Error saving config");
+          }  
           return;
 
       case HTTP_UPDATE_NO_UPDATES:
@@ -555,7 +573,7 @@ void doUpdate()
           return;
 
       case HTTP_UPDATE_OK:
-          Serial.println("HTTP_UPDATE_OK");
+          Serial.println("Update successful");
           return;
     }
 }
