@@ -69,13 +69,13 @@ const char homepage[] PROGMEM =
 "  </fieldset>"
 "  </form></p>"
 
-"  <p><form action=\"api\" method=\"get\" onSubmit=\"return confirm('Sicher? WLAN Zugangsdaten werden gel&ouml;scht!');\" ><fieldset><legend>Reset</legend>"
+"  <p><form action=\"api\" method=\"post\" onSubmit=\"return confirm('Sicher? WLAN Zugangsdaten werden gel&ouml;scht!');\" ><fieldset><legend>Reset</legend>"
 "  <input type=\"submit\" value=\"Reset\"/>"
 "  <input type=\"hidden\" name=\"reset\" value=\"1\" />"
 "  </fieldset>"
 "  </form></p>"
 
-"  <p><form action=\"api\" method=\"get\" onSubmit=\"return confirm('Sicher?');\" ><fieldset><legend>Update</legend>"
+"  <p><form action=\"api\" method=\"post\" onSubmit=\"return confirm('Sicher?');\" ><fieldset><legend>Update</legend>"
 "  <input type=\"submit\" value=\"Update\"/>"
 "  <input type=\"hidden\" name=\"update\" value=\"1\" />"
 "  </fieldset>"
