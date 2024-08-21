@@ -1,12 +1,19 @@
 
-#include <FS.h> //this needs to be first, or it all crashes and burns...
+#include <FS.h>
+
+#define UPDATE_URL "https://api.github.com/repos/twoinke/nixieclock/releases/latest"
+#define UPDATE_BINFILE "Nixie.ino.bin"
+
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h> 
-
+#include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPClient.h>
 #include <WiFiManager.h> 
-#include <ElegantOTA.h>
+#include <WiFiClientSecure.h>
 
+#include <ElegantOTA.h>
+#include <ArduinoJson.h>
 
 // Select a Timer Clock
 #define USING_TIM_DIV1                false           // for shortest and most accurate timer
@@ -29,6 +36,8 @@
 #define MY_HOSTNAME                  "nixieclock"
 #define MY_NTP_SERVER                "de.pool.ntp.org"  
 #define MY_TZ                        "CET-1CEST,M3.5.0/02,M10.5.0/03"  
+#define RELEASE_TAG                  "v00"  
+
 
 #define SERIAL_BAUDRATE              115200
 #define WEBSERVER_PORT               80
@@ -69,11 +78,13 @@ const char homepage[] PROGMEM =
 "</body></html>";
 
 
+String updateURL = "";
 
 struct configStruct {
   char hostname[32];
   char ntp_server[32];
   char timezone[32];
+  char release_tag[4];
 };
 
 struct configStruct config;
@@ -87,6 +98,7 @@ uint8_t led_mode = LEDS_ON;
 // bool leds_on = true;
 // bool blink = false;
 bool enabled = true;
+bool update = false;
 
 // Init ESP8266 timer 1
 ESP8266Timer ITimer;
@@ -240,8 +252,8 @@ void IRAM_ATTR getTime()
 
 //flag for saving data
 bool shouldSaveConfig = false;
-
 unsigned long ota_progress_millis = 0;
+
 
 //callback notifying us of the need to save config
 void saveConfigCallback () {
@@ -325,6 +337,8 @@ void setup()
   strncpy(config.ntp_server, MY_NTP_SERVER, 32);
   strncpy(config.hostname, MY_HOSTNAME, 32);
   strncpy(config.timezone, MY_TZ, 32);
+  strncpy(config.release_tag, RELEASE_TAG, 4);
+  
 
   Serial.begin(SERIAL_BAUDRATE);
 
@@ -416,6 +430,152 @@ void setup()
   Serial.println("HTTP server started"); 
 
 
+  updateFromGithub();
+
+  if (updateURL.length() > 0)
+  {
+    doUpdate();
+  }
+
+  
+}
+
+
+
+void updateFromGithub() 
+{
+  JsonDocument doc;
+  WiFiClientSecure client;
+
+  client.setInsecure();
+  if (!client.connect("api.github.com", 443)) 
+  {
+    Serial.println("Connection to api.github.com failed");
+    return;
+  }
+  Serial.println("Connection established");
+
+  client.print(String("GET ") + String(UPDATE_URL) + " HTTP/1.1\r\n" +
+    "Host: api.github.com\r\n" +
+    "User-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\n" +
+    "Connection: close\r\n\r\n");
+
+  
+  while (client.connected()) 
+  {
+    String response = client.readStringUntil('\n');
+    if (response == "\r") 
+    {
+			break;
+    }
+  }
+
+  String response = client.readStringUntil('\n');
+
+  DeserializationError error = deserializeJson(doc, response);
+
+  if (error)
+  {
+    Serial.println("Error parsing JSON response");
+    return;
+  }
+
+  const char* release_tag;
+
+  if (doc.containsKey("tag_name")) 
+  {
+    release_tag = doc["tag_name"];
+    Serial.println(release_tag);
+  }
+
+  if (strcmp(release_tag, config.release_tag) != 0 && ! doc["prerelease"]) 
+  {
+    Serial.println("Update found.");
+
+    JsonArray assets = doc["assets"];
+    bool valid_asset = false;
+    for (auto asset : assets) 
+    {
+      const char* asset_type = asset["content_type"];
+      const char* asset_name = asset["name"];
+      const char* asset_url = asset["browser_download_url"];
+
+      Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
+
+      if (strcmp(asset_type, "raw") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
+      {
+        updateURL = asset_url;
+
+        Serial.println("Update URL:" + updateURL);
+        strncpy(config.release_tag, release_tag, 4);
+
+        if (! saveConfig(CONFIGFILE))
+        {
+          Serial.println("Error saving config");
+        }  
+
+        return;
+      }
+    }
+}
+}
+
+void doUpdate()
+{
+    ISR_Timer.disableAll();
+
+    writeByte(0);
+    pinMode(D0, INPUT);  
+    pinMode(D1, INPUT);  
+    pinMode(D2, INPUT);  
+    pinMode(D3, INPUT);  
+    // pinMode(D4, INPUT);  
+    pinMode(D5, INPUT);  
+    pinMode(D6, INPUT);  
+    pinMode(D7, INPUT);  
+    pinMode(D8, INPUT); 
+
+
+    WiFiClientSecure updateClient;
+    updateClient.setInsecure();
+
+
+
+    // bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
+    // if (mfln) 
+    // {
+      // updateClient.setBufferSizes(1024, 1024);
+    // }
+
+    ESPhttpUpdate.setLedPin(D4, LOW);
+    ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    Serial.println("Updating from " + updateURL);
+
+
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, updateURL);
+
+    switch (ret) 
+    {
+      case HTTP_UPDATE_FAILED:
+          Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
+          strncpy(config.release_tag, RELEASE_TAG, 4);
+
+          if (! saveConfig(CONFIGFILE))
+          {
+            Serial.println("Error saving config");
+          }  
+          return;
+
+      case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          return;
+
+      case HTTP_UPDATE_OK:
+          Serial.println("Update successful");
+          return;
+    }
 }
 
 void initOTA()
