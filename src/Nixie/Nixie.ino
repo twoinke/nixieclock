@@ -683,11 +683,13 @@ void handleAPI()
   {
       updateFromGithub();
 
-      if (updateURL.length() > 0)
+      if (updateURL.length() == 0)
       {
-        doUpdate();
+        server.send(404, "text/plain", "No Update found");
+        return;
       }
 
+      doUpdate();
   }
 
   server.sendHeader("Location","/");
