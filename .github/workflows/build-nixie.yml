@@ -30,34 +30,34 @@ jobs:
       - name: Compile Sketch
         run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone --warnings all ./src/Nixie
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nixie-binary
-          path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: nixie-binary
+      #     path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
   
-  release:
-    needs: build
-    runs-on: ubuntu-latest
+  # release:
+  #   needs: build
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: nixie-binary
-          path: ./  # Where to download the artifact
+  #     - name: Download build artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: nixie-binary
+  #         path: ./  # Where to download the artifact
           
-      - name: Create Release
-        id: create_release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: v${{ github.run_number }}
-          name: Release ${{ github.run_number }}
-          body: Automatically generated release ${{ github.run_number }}
-          draft: false
-          prerelease: false
-          artifacts: |
-            Nixie.ino.bin  
+  #     - name: Create Release
+  #       id: create_release
+  #       uses: ncipollo/release-action@v1
+  #       with:
+  #         tag: v${{ github.run_number }}
+  #         name: Release ${{ github.run_number }}
+  #         body: Automatically generated release ${{ github.run_number }}
+  #         draft: false
+  #         prerelease: false
+  #         artifacts: |
+  #           Nixie.ino.bin  
