@@ -3,6 +3,8 @@
 
 #define UPDATE_URL "https://api.github.com/repos/twoinke/nixieclock/releases/latest"
 #define UPDATE_BINFILE "Nixie.ino.bin"
+#define UPDATE_BINFILE_COMPRESSED "Nixie.ino.bin.gz"
+
 
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
@@ -11,6 +13,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiManager.h> 
 #include <WiFiClientSecure.h>
+#include <ESP8266HTTPUpdateServer.h>
 
 #include <ElegantOTA.h>
 #include <ArduinoJson.h>
@@ -116,6 +119,7 @@ ESP8266_ISR_Timer ISR_Timer;
 WiFiManager wifiManager;
 
 ESP8266WebServer server(WEBSERVER_PORT);
+ESP8266HTTPUpdateServer httpUpdater;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -362,12 +366,20 @@ void setup()
     {
       Serial.println("Error loading config");
     }
-    Serial.printf("Config loaded:\nHostname: %s\nNTP Server: %s\nTimezone: %s\n", config.hostname, config.ntp_server, config.timezone);
+    Serial.printf("Config loaded:\nHostname: %s\nNTP Server: %s\nTimezone: %s\nRelease: %s\n", 
+      config.hostname, 
+      config.ntp_server, 
+      config.timezone,
+      config.release_tag);
   }
   else
   {
     Serial.println("failed to mount FS. Attempting to format.");
     SPIFFS.format();
+    Serial.println("format done.");
+
+    saveConfig(CONFIGFILE);
+
   }
 
   
@@ -433,6 +445,7 @@ void setup()
 
   initOTA();
 
+  httpUpdater.setup(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
   
@@ -451,7 +464,7 @@ void updateFromGithub()
     Serial.println("Connection to api.github.com failed");
     return;
   }
-  Serial.println("Connection established");
+  Serial.println("Connection to api.github.com established");
 
   client.print(String("GET ") + String(UPDATE_URL) + " HTTP/1.1\r\n" +
     "Host: api.github.com\r\n" +
@@ -483,7 +496,9 @@ void updateFromGithub()
   if (doc.containsKey("tag_name")) 
   {
     release_tag = doc["tag_name"];
-    Serial.println(release_tag);
+    Serial.printf("Found release %s\n", release_tag);
+    Serial.printf("Current release %s\n", config.release_tag);
+    
   }
 
   if (strcmp(release_tag, config.release_tag) != 0 && ! doc["prerelease"]) 
@@ -500,18 +515,24 @@ void updateFromGithub()
 
       Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
 
-      if (strcmp(asset_type, "raw") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
+      if (strcmp(asset_type, "application/gzip") == 0 && strcmp(asset_name, UPDATE_BINFILE_COMPRESSED) == 0) 
       {
         updateURL = asset_url;
 
         Serial.println("Update URL:" + updateURL);
+
         strncpy(config.release_tag, release_tag, 4);
+        return;
+      }
 
-        if (! saveConfig(CONFIGFILE))
-        {
-          Serial.println("Error saving config");
-        }  
 
+      if (strcmp(asset_type, "application/octet-stream") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
+      {
+        updateURL = asset_url;
+
+        Serial.println("Update URL:" + updateURL);
+
+        strncpy(config.release_tag, release_tag, 4);
         return;
       }
     }
@@ -520,20 +541,6 @@ void updateFromGithub()
 
 void doUpdate()
 {
-    ISR_Timer.disableAll();
-
-    writeByte(0);
-    pinMode(D0, INPUT);  
-    pinMode(D1, INPUT);  
-    pinMode(D2, INPUT);  
-    pinMode(D3, INPUT);  
-    // pinMode(D4, INPUT);  
-    pinMode(D5, INPUT);  
-    pinMode(D6, INPUT);  
-    pinMode(D7, INPUT);  
-    pinMode(D8, INPUT); 
-
-
     WiFiClientSecure updateClient;
     updateClient.setInsecure();
 
@@ -546,10 +553,10 @@ void doUpdate()
     // }
 
     ESPhttpUpdate.setLedPin(D4, LOW);
+    ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
     Serial.println("Updating from " + updateURL);
-
 
 
     t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, updateURL);
@@ -558,12 +565,6 @@ void doUpdate()
     {
       case HTTP_UPDATE_FAILED:
           Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
-          strncpy(config.release_tag, RELEASE_TAG, 4);
-
-          if (! saveConfig(CONFIGFILE))
-          {
-            Serial.println("Error saving config");
-          }  
           return;
 
       case HTTP_UPDATE_NO_UPDATES:
@@ -572,12 +573,40 @@ void doUpdate()
 
       case HTTP_UPDATE_OK:
           Serial.println("Update successful");
-          return;
+
+          if (! saveConfig(CONFIGFILE))
+          {
+            Serial.println("Error saving config");
+            return;
+          }  
+          ESP.restart();
+
     }
 }
 
 void initOTA()
 {
+
+  ESPhttpUpdate.onStart([]() 
+  {
+    Serial.println("update process started.");
+    // OTA will fail with HW timers enabled
+    ISR_Timer.disableAll();
+    Serial.println("HW timers disabled.");
+
+    writeByte(0);
+    pinMode(D0, INPUT);  
+    pinMode(D1, INPUT);  
+    pinMode(D2, INPUT);  
+    pinMode(D3, INPUT);  
+    pinMode(D4, INPUT);  
+    pinMode(D5, INPUT);  
+    pinMode(D6, INPUT);  
+    pinMode(D7, INPUT);  
+    pinMode(D8, INPUT); 
+
+  });
+
 
   ElegantOTA.onStart([]() 
   {
@@ -617,15 +646,16 @@ void initOTA()
     }
   });
 
-  ElegantOTA.begin(&server);
 
+  ElegantOTA.begin(&server);
 }
+
+
 void loop(void)
 {
   server.handleClient();                    // Listen for HTTP requests from clients
   ElegantOTA.loop();
 }
-
 
 void handleRoot() 
 {  
