@@ -43,6 +43,9 @@
 #define MY_TZ                        "CET-1CEST,M3.5.0/02,M10.5.0/03"  
 #define RELEASE_TAG                  "v00"  
 
+#define HRS_12 43200000UL // 12 * 60 * 60 * 1000UL; 12 hours
+
+
 
 #define SERIAL_BAUDRATE              115200
 #define WEBSERVER_PORT               80
@@ -119,14 +122,16 @@ ESP8266WebServer server(WEBSERVER_PORT);
 // ESP8266HTTPUpdateServer httpUpdater;
 
 
+#ifdef DEBUG
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
   Serial.print(F("time was sent! from_sntp=")); Serial.println(from_sntp);
 }
+#endif
+
 
 uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
 {
-  Serial.println("sntp update delay dingens called");
-  return 24 * 60 * 60 * 1000UL; // 24 hours
+  return HRS_12; 
 }
 
 int8_t IRAM_ATTR dec_to_bcd(int8_t dec)
@@ -430,7 +435,9 @@ void setup()
 
   WiFi.hostname(config.hostname);
 
+#ifdef DEBUG
   settimeofday_cb(time_is_set); // optional: callback if time was sent
+#endif
   configTime(config.timezone, config.ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
   if (!MDNS.begin(config.hostname))
