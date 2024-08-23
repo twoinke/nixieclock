@@ -107,13 +107,6 @@ time_t now;
 tm tm;
 volatile uint8_t tubes[4];
 
-// uint8_t led_mode = LEDS_ON;
-
-// bool leds_on = true;
-// bool blink = false;
-// bool enabled = true;
-bool update = false;
-
 // Init ESP8266 timer 1
 ESP8266Timer ITimer;
 
@@ -389,7 +382,7 @@ void setup()
   {
     digitalWrite(D8, true); // LEDs
   }
-  
+
   writeByte(0);
   setNixieTube(1, 2);
 
