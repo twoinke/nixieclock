@@ -406,6 +406,7 @@ void setup()
   writeByte(0);
   setNixieTube(2, 3);
 
+
    //save the custom parameters to FS
   if (shouldSaveConfig) 
   {
@@ -416,6 +417,13 @@ void setup()
     }    
   }
 
+  updateFromGithub();
+
+  if (updateURL.length() != 0)
+  {
+    doUpdate();
+  }
+  
   writeByte(0);
   setNixieTube(3, 4);
 
@@ -424,11 +432,6 @@ void setup()
 
   settimeofday_cb(time_is_set); // optional: callback if time was sent
   configTime(config.timezone, config.ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
-
-  
-  Serial.println("Connected, IP address: ");
-  Serial.println(WiFi.localIP());
-
 
   if (!MDNS.begin(config.hostname))
   {
@@ -443,12 +446,23 @@ void setup()
   server.onNotFound(handleNotFound);        // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
 
 
-  initOTA();
+  ESPhttpUpdate.onStart(beginOTAUpdate);
+  ElegantOTA.onStart(beginOTAUpdate);
+
+  ElegantOTA.onProgress(onOTAProgress);
+  ESPhttpUpdate.onProgress(onOTAProgress);
+
+  ElegantOTA.onEnd(onOTAEnd);
+  ESPhttpUpdate.onEnd(onOTAEnd2);
+
+  ElegantOTA.begin(&server);
 
   // httpUpdater.setup(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
-  
+
+
+
 }
 
 
@@ -560,7 +574,7 @@ void doUpdate()
       Serial.println("Set buffer sizes to 1024");
     }
 
-    // ESPhttpUpdate.setLedPin(D4, LOW);
+    ESPhttpUpdate.setLedPin(D8, HIGH);
     ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
@@ -640,19 +654,7 @@ void onOTAEnd(bool success)
 void initOTA()
 {
 
-  ESPhttpUpdate.onStart(beginOTAUpdate);
-  ElegantOTA.onStart(beginOTAUpdate);
 
-
-  ElegantOTA.onProgress(onOTAProgress);
-  ESPhttpUpdate.onProgress(onOTAProgress);
-
-
-  ElegantOTA.onEnd(onOTAEnd);
-  ESPhttpUpdate.onEnd(onOTAEnd2);
-
-
-  ElegantOTA.begin(&server);
 }
 
 
