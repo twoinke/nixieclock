@@ -1,7 +1,9 @@
 
 #include <FS.h>
 
-#define UPDATE_URL "https://api.github.com/repos/twoinke/nixieclock/releases/latest"
+#define UPDATE_HOST "api.github.com"
+#define UPDATE_URL "/repos/twoinke/nixieclock/releases/latest"
+
 #define UPDATE_BINFILE "Nixie.ino.bin"
 #define UPDATE_BINFILE_COMPRESSED "Nixie.ino.bin.gz"
 
@@ -13,7 +15,7 @@
 #include <ESP8266HTTPClient.h>
 #include <WiFiManager.h> 
 #include <WiFiClientSecure.h>
-#include <ESP8266HTTPUpdateServer.h>
+// #include <ESP8266HTTPUpdateServer.h>
 
 #include <ElegantOTA.h>
 #include <ArduinoJson.h>
@@ -95,6 +97,8 @@ struct configStruct {
   char ntp_server[32];
   char timezone[32];
   char release_tag[4];
+  bool enabled;
+  uint8_t led_mode;
 };
 
 struct configStruct config;
@@ -103,11 +107,11 @@ time_t now;
 tm tm;
 volatile uint8_t tubes[4];
 
-uint8_t led_mode = LEDS_ON;
+// uint8_t led_mode = LEDS_ON;
 
 // bool leds_on = true;
 // bool blink = false;
-bool enabled = true;
+// bool enabled = true;
 bool update = false;
 
 // Init ESP8266 timer 1
@@ -119,7 +123,7 @@ ESP8266_ISR_Timer ISR_Timer;
 WiFiManager wifiManager;
 
 ESP8266WebServer server(WEBSERVER_PORT);
-ESP8266HTTPUpdateServer httpUpdater;
+// ESP8266HTTPUpdateServer httpUpdater;
 
 
 void time_is_set(bool from_sntp /* <= this optional parameter can be used with ESP8266 Core 3.0.0*/) {
@@ -168,7 +172,7 @@ void IRAM_ATTR updateNixies()
     return;
   }
 
-  if (! enabled )
+  if (! config.enabled )
   {
     return;
   }
@@ -203,7 +207,7 @@ void IRAM_ATTR getTime()
   time(&now);
   localtime_r(&now, &tm);
 
-  if (led_mode == LEDS_BLINK)
+  if (config.led_mode == LEDS_BLINK)
   {
     digitalWrite(D8, !digitalRead(D8)); 
   }
@@ -335,10 +339,7 @@ void setup()
   
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler);
   
-  if (led_mode == LEDS_ON)
-  {
-    digitalWrite(D8, true); // LEDs
-  }
+
   writeByte(0);
   setNixieTube(0, 1);
   
@@ -349,6 +350,8 @@ void setup()
   strncpy(config.hostname, MY_HOSTNAME, 32);
   strncpy(config.timezone, MY_TZ, 32);
   strncpy(config.release_tag, RELEASE_TAG, 4);
+  config.led_mode = LEDS_ON;
+  config.enabled = true;
   
 
   Serial.begin(SERIAL_BAUDRATE);
@@ -382,6 +385,10 @@ void setup()
 
   }
 
+  if (config.led_mode == LEDS_ON)
+  {
+    digitalWrite(D8, true); // LEDs
+  }
   
   writeByte(0);
   setNixieTube(1, 2);
@@ -445,7 +452,7 @@ void setup()
 
   initOTA();
 
-  httpUpdater.setup(&server);
+  // httpUpdater.setup(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
   
@@ -459,15 +466,16 @@ void updateFromGithub()
   WiFiClientSecure client;
 
   client.setInsecure();
-  if (!client.connect("api.github.com", 443)) 
+
+  if (!client.connect(UPDATE_HOST, 443)) 
   {
-    Serial.println("Connection to api.github.com failed");
+    Serial.printf("Connection to %s failed\n", UPDATE_HOST );
     return;
   }
-  Serial.println("Connection to api.github.com established");
 
+  Serial.printf("Connection to %s established\n", UPDATE_HOST);
   client.print(String("GET ") + String(UPDATE_URL) + " HTTP/1.1\r\n" +
-    "Host: api.github.com\r\n" +
+    "Host: " + String(UPDATE_HOST) + "\r\n" +
     "User-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\n" +
     "Connection: close\r\n\r\n");
 
@@ -493,51 +501,57 @@ void updateFromGithub()
 
   const char* release_tag;
 
-  if (doc.containsKey("tag_name")) 
+  if (! doc.containsKey("tag_name")) 
   {
-    release_tag = doc["tag_name"];
-    Serial.printf("Found release %s\n", release_tag);
-    Serial.printf("Current release %s\n", config.release_tag);
-    
+    Serial.println("no release tag found");
+    return;
   }
 
-  if (strcmp(release_tag, config.release_tag) != 0 && ! doc["prerelease"]) 
+  release_tag = doc["tag_name"];
+  Serial.printf("Found release %s\n", release_tag);
+  Serial.printf("Current release %s\n", config.release_tag); 
+
+  if (strcmp(release_tag, config.release_tag) == 0 || doc["prerelease"]) 
   {
-    Serial.println("Update found.");
+    Serial.println("No update found.");
+    return;
+  }
 
-    JsonArray assets = doc["assets"];
-    bool valid_asset = false;
-    for (auto asset : assets) 
+  Serial.println("Update found.");
+
+  JsonArray assets = doc["assets"];
+  bool valid_asset = false;
+  for (auto asset : assets) 
+  {
+    const char* asset_type = asset["content_type"];
+    const char* asset_name = asset["name"];
+    const char* asset_url = asset["browser_download_url"];
+
+    Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
+
+    if (strcmp(asset_type, "application/gzip") == 0 && strcmp(asset_name, UPDATE_BINFILE_COMPRESSED) == 0) 
     {
-      const char* asset_type = asset["content_type"];
-      const char* asset_name = asset["name"];
-      const char* asset_url = asset["browser_download_url"];
+      updateURL = asset_url;
 
-      Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
+      Serial.println("Update URL:" + updateURL);
 
-      if (strcmp(asset_type, "application/gzip") == 0 && strcmp(asset_name, UPDATE_BINFILE_COMPRESSED) == 0) 
-      {
-        updateURL = asset_url;
-
-        Serial.println("Update URL:" + updateURL);
-
-        strncpy(config.release_tag, release_tag, 4);
-        return;
-      }
-
-
-      if (strcmp(asset_type, "application/octet-stream") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
-      {
-        updateURL = asset_url;
-
-        Serial.println("Update URL:" + updateURL);
-
-        strncpy(config.release_tag, release_tag, 4);
-        return;
-      }
+      strncpy(config.release_tag, release_tag, 4);
+      return;
     }
+
+    if (strcmp(asset_type, "application/octet-stream") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
+    {
+      updateURL = asset_url;
+
+      Serial.println("Update URL:" + updateURL);
+
+      strncpy(config.release_tag, release_tag, 4);
+      return;
+    }
+  }
+  
 }
-}
+
 
 void doUpdate()
 {
@@ -546,13 +560,14 @@ void doUpdate()
 
 
 
-    // bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
-    // if (mfln) 
-    // {
-      // updateClient.setBufferSizes(1024, 1024);
-    // }
+    bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
+    if (mfln) 
+    {
+      updateClient.setBufferSizes(1024, 1024);
+      Serial.println("Set buffer sizes to 1024");
+    }
 
-    ESPhttpUpdate.setLedPin(D4, LOW);
+    // ESPhttpUpdate.setLedPin(D4, LOW);
     ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
@@ -579,72 +594,69 @@ void doUpdate()
             Serial.println("Error saving config");
             return;
           }  
+          Serial.println("config saved. Restarting.. ");
+
           ESP.restart();
 
     }
 }
 
+void beginOTAUpdate()
+{
+  Serial.println("update process started.");
+  // OTA will fail with HW timers enabled
+  ISR_Timer.disableAll();
+  Serial.println("HW timers disabled.");
+
+  writeByte(0);
+  pinMode(D0, INPUT);  
+  pinMode(D1, INPUT);  
+  pinMode(D2, INPUT);  
+  pinMode(D3, INPUT);  
+  pinMode(D4, INPUT);  
+  pinMode(D5, INPUT);  
+  pinMode(D6, INPUT);  
+  pinMode(D7, INPUT);  
+  pinMode(D8, INPUT); 
+}
+
+void onOTAProgress(size_t current, size_t final)
+{
+  // Log every 1 second
+  if (millis() - ota_progress_millis > 1000) {
+    ota_progress_millis = millis();
+    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
+  }
+}
+
+void onOTAEnd2()
+{
+  onOTAEnd(true);
+}
+void onOTAEnd(bool success)
+{
+  // Log when OTA has finished
+  if (success) {
+    Serial.println("OTA update finished successfully!");
+    return;
+  } 
+
+  Serial.println("There was an error during OTA update!");
+}
+
 void initOTA()
 {
 
-  ESPhttpUpdate.onStart([]() 
-  {
-    Serial.println("update process started.");
-    // OTA will fail with HW timers enabled
-    ISR_Timer.disableAll();
-    Serial.println("HW timers disabled.");
-
-    writeByte(0);
-    pinMode(D0, INPUT);  
-    pinMode(D1, INPUT);  
-    pinMode(D2, INPUT);  
-    pinMode(D3, INPUT);  
-    pinMode(D4, INPUT);  
-    pinMode(D5, INPUT);  
-    pinMode(D6, INPUT);  
-    pinMode(D7, INPUT);  
-    pinMode(D8, INPUT); 
-
-  });
+  ESPhttpUpdate.onStart(beginOTAUpdate);
+  ElegantOTA.onStart(beginOTAUpdate);
 
 
-  ElegantOTA.onStart([]() 
-  {
-    Serial.println("ElegantOTA update process started.");
-    // OTA will fail with HW timers enabled
-    ISR_Timer.disableAll();
-   
-    writeByte(0);
-    pinMode(D0, INPUT);  
-    pinMode(D1, INPUT);  
-    pinMode(D2, INPUT);  
-    pinMode(D3, INPUT);  
-    pinMode(D4, INPUT);  
-    pinMode(D5, INPUT);  
-    pinMode(D6, INPUT);  
-    pinMode(D7, INPUT);  
-    pinMode(D8, INPUT); 
+  ElegantOTA.onProgress(onOTAProgress);
+  ESPhttpUpdate.onProgress(onOTAProgress);
 
-  });
 
-  ElegantOTA.onProgress([](size_t current, size_t final)
-  {
-    // Log every 1 second
-    if (millis() - ota_progress_millis > 1000) {
-      ota_progress_millis = millis();
-      Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
-    }
-  });
-
-  ElegantOTA.onEnd([](bool success)
-  {
-    // Log when OTA has finished
-    if (success) {
-      Serial.println("OTA update finished successfully!");
-    } else {
-      Serial.println("There was an error during OTA update!");
-    }
-  });
+  ElegantOTA.onEnd(onOTAEnd);
+  ESPhttpUpdate.onEnd(onOTAEnd2);
 
 
   ElegantOTA.begin(&server);
@@ -668,10 +680,10 @@ void handleAPI()
 
   if (server.hasArg("led_mode"))
   {
-    led_mode = server.arg("led_mode").toInt();
-    if (led_mode >= 0 && led_mode <=2)
+    config.led_mode = server.arg("led_mode").toInt();
+    if (config.led_mode == LEDS_OFF || config.led_mode == LEDS_ON || config.led_mode == LEDS_BLINK)
     {
-      if (led_mode > 0)
+      if (config.led_mode > 0)
       {
         digitalWrite(D8, true); // LEDs
       }
@@ -680,7 +692,8 @@ void handleAPI()
         digitalWrite(D8, false); // LEDs
       }
 
-      Serial.printf("LEDs: %d\n", led_mode);
+      Serial.printf("LEDs: %d\n", config.led_mode);
+      saveConfig(CONFIGFILE);
     }   
 
   }
@@ -690,15 +703,18 @@ void handleAPI()
 
     if (tmp == 0)
     {
-      enabled = 0;
+      config.enabled = false;
       writeByte(0);
-      Serial.printf("Enabled: %d\n", enabled);
+      Serial.printf("Enabled: %d\n", config.enabled);
     }
     else
     {
-      enabled = 1;
-      Serial.printf("Enabled: %d\n", enabled);
+      config.enabled = 1;
+      Serial.printf("Enabled: %d\n", config.enabled);
     }
+
+    saveConfig(CONFIGFILE);
+
   }
   else if (server.hasArg("reset"))
   {
