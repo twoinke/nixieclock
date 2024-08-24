@@ -155,7 +155,6 @@ void IRAM_ATTR TimerHandler()
 void IRAM_ATTR getTime()
 { 
   static int8_t cnt = 0;
-  static int8_t tmp = 0;
   
   time(&now);
   localtime_r(&now, &tm);
