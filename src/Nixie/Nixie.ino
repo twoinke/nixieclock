@@ -77,9 +77,11 @@ const char homepage[] PROGMEM =
 "  </fieldset>"
 "  </form></p>"
 
-"  <p><form action=\"api\" method=\"post\" onSubmit=\"return confirm('Sicher? WLAN Zugangsdaten werden gel&ouml;scht!');\" ><fieldset><legend>Reset</legend>"
-"  <input type=\"submit\" value=\"Reset\"/>"
-"  <input type=\"hidden\" name=\"reset\" value=\"1\" />"
+"  <p><form action=\"/api\" method=\"post\">"
+"  <fieldset><legend>Check for update on startup</legend>"
+"  <input type=\"radio\" name=\"update_startup\" value=\"0\" /><label>no</label>"
+"  <input type=\"radio\" name=\"update_startup\" value=\"1\" checked /><label>yes</label>"
+"  <input type=\"submit\" value=\"Send\" />"
 "  </fieldset>"
 "  </form></p>"
 
@@ -90,6 +92,12 @@ const char homepage[] PROGMEM =
 "  </form></p>"
 
 "  <p><a href=\"/update\">update</a></p>"
+
+"  <p><form action=\"api\" method=\"post\" onSubmit=\"return confirm('Sicher? WLAN Zugangsdaten werden gel&ouml;scht!');\" ><fieldset><legend>Reset</legend>"
+"  <input type=\"submit\" value=\"Reset\"/>"
+"  <input type=\"hidden\" name=\"reset\" value=\"1\" />"
+"  </fieldset>"
+"  </form></p>"
 "</body></html>";
 
 
@@ -102,6 +110,7 @@ struct configStruct {
   char release_tag[4];
   bool enabled;
   uint8_t led_mode;
+  bool update_startup;
 };
 
 struct configStruct config;
@@ -350,6 +359,7 @@ void setup()
   strncpy(config.release_tag, RELEASE_TAG, 4);
   config.led_mode = LEDS_ON;
   config.enabled = true;
+  config.update_startup = false;
   
 
   Serial.begin(SERIAL_BAUDRATE);
@@ -421,17 +431,21 @@ void setup()
       Serial.println("Error saving config");
     }    
   }
-
-  updateFromGithub();
-
-  if (updateURL.length() != 0)
+  
+  if (config.update_startup)
   {
-    doUpdate();
+    Serial.println("checking for online update");
+
+    updateFromGithub();
+
+    if (updateURL.length() != 0)
+    {
+      doUpdate();
+    }
   }
   
   writeByte(0);
   setNixieTube(3, 4);
-
 
   WiFi.hostname(config.hostname);
 
@@ -713,6 +727,25 @@ void handleAPI()
     {
       config.enabled = 1;
       Serial.printf("Enabled: %d\n", config.enabled);
+    }
+
+    saveConfig(CONFIGFILE);
+
+  }
+  else if(server.hasArg("update_startup"))
+  {
+    tmp = server.arg("update_startup").toInt();
+
+    if (tmp == 0)
+    {
+      config.update_startup = false;
+      writeByte(0);
+      Serial.printf("Enabled: %d\n", config.update_startup);
+    }
+    else
+    {
+      config.update_startup = true;
+      Serial.printf("Enabled: %d\n", config.update_startup);
     }
 
     saveConfig(CONFIGFILE);
