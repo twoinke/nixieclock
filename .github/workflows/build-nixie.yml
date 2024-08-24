@@ -61,7 +61,7 @@ jobs:
           name: Release ${{ github.run_number }}
           body: Automatically generated release ${{ github.run_number }}
           draft: false
-          prerelease: true
+          prerelease: false
           artifactContentType: "application/gzip"
           artifacts: |
             Nixie.ino.bin.gz
