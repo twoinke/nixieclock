@@ -4,8 +4,7 @@
 #define UPDATE_HOST "api.github.com"
 #define UPDATE_URL "/repos/twoinke/nixieclock/releases/latest"
 
-#define UPDATE_BINFILE "Nixie.ino.bin"
-#define UPDATE_BINFILE_COMPRESSED "Nixie.ino.bin.gz"
+
 
 
 #include <ESP8266WiFi.h>
@@ -16,10 +15,7 @@
 #include <WiFiManager.h> 
 #include <WiFiClientSecure.h>
 // #include <ESP8266HTTPUpdateServer.h>
-#include "NixieMultiplexer.h"
-
 #include <ElegantOTA.h>
-#include <ArduinoJson.h>
 
 // Select a Timer Clock
 #define USING_TIM_DIV1                false           // for shortest and most accurate timer
@@ -32,6 +28,9 @@
 
 #include <time.h>
 #include <coredecls.h> // optional settimeofday_cb() callback to check on server
+
+#include "NixieMultiplexer.h"
+#include "GithubOTA.h"
 
 
 // config filename
@@ -120,6 +119,7 @@ time_t now;
 tm tm;
 
 NixieMultiplexer mux;
+
 
 // Init ESP8266 timer 1
 ESP8266Timer ITimer;
@@ -365,12 +365,7 @@ void setup()
   {
     Serial.println("checking for online update");
 
-    updateFromGithub();
-
-    if (updateURL.length() != 0)
-    {
-      doUpdate();
-    }
+    handleGithubUpdate();
   }
   
   mux.writeByte(0);
@@ -419,144 +414,11 @@ void setup()
 
 void updateFromGithub() 
 {
-  JsonDocument doc;
-  WiFiClientSecure client;
-
-  client.setInsecure();
-
-  if (!client.connect(UPDATE_HOST, 443)) 
-  {
-    Serial.printf("Connection to %s failed\n", UPDATE_HOST );
-    return;
-  }
-
-  Serial.printf("Connection to %s established\n", UPDATE_HOST);
-  client.print(String("GET ") + String(UPDATE_URL) + " HTTP/1.1\r\n" +
-    "Host: " + String(UPDATE_HOST) + "\r\n" +
-    "User-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\n" +
-    "Connection: close\r\n\r\n");
-
-  
-  while (client.connected()) 
-  {
-    String response = client.readStringUntil('\n');
-    if (response == "\r") 
-    {
-			break;
-    }
-  }
-
-  String response = client.readStringUntil('\n');
-
-  DeserializationError error = deserializeJson(doc, response);
-
-  if (error)
-  {
-    Serial.println("Error parsing JSON response");
-    return;
-  }
-
-  const char* release_tag;
-
-  if (! doc.containsKey("tag_name")) 
-  {
-    Serial.println("no release tag found");
-    return;
-  }
-
-  release_tag = doc["tag_name"];
-  Serial.printf("Found release %s\n", release_tag);
-  Serial.printf("Current release %s\n", config.release_tag); 
-
-  if (strcmp(release_tag, config.release_tag) == 0 || doc["prerelease"]) 
-  {
-    Serial.println("No update found.");
-    return;
-  }
-
-  Serial.println("Update found.");
-
-  JsonArray assets = doc["assets"];
-  bool valid_asset = false;
-  for (auto asset : assets) 
-  {
-    const char* asset_type = asset["content_type"];
-    const char* asset_name = asset["name"];
-    const char* asset_url = asset["browser_download_url"];
-
-    Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
-
-    if (strcmp(asset_type, "application/gzip") == 0 && strcmp(asset_name, UPDATE_BINFILE_COMPRESSED) == 0) 
-    {
-      updateURL = asset_url;
-
-      Serial.println("Update URL:" + updateURL);
-
-      strncpy(config.release_tag, release_tag, 4);
-      return;
-    }
-
-    if (strcmp(asset_type, "application/octet-stream") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
-    {
-      updateURL = asset_url;
-
-      Serial.println("Update URL:" + updateURL);
-
-      strncpy(config.release_tag, release_tag, 4);
-      return;
-    }
-  }
   
 }
 
 
-void doUpdate()
-{
-    WiFiClientSecure updateClient;
-    updateClient.setInsecure();
 
-
-
-    bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
-    if (mfln) 
-    {
-      updateClient.setBufferSizes(1024, 1024);
-      Serial.println("Set buffer sizes to 1024");
-    }
-
-    ESPhttpUpdate.setLedPin(D8, HIGH);
-    ESPhttpUpdate.rebootOnUpdate(false);
-    ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-    Serial.println("Updating from " + updateURL);
-
-
-    t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, updateURL);
-
-    switch (ret) 
-    {
-      case HTTP_UPDATE_FAILED:
-          Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
-          return;
-
-      case HTTP_UPDATE_NO_UPDATES:
-          Serial.println("HTTP_UPDATE_NO_UPDATES");
-          return;
-
-      case HTTP_UPDATE_OK:
-          Serial.println("Update successful");
-
-          if (! saveConfig(CONFIGFILE))
-          {
-            Serial.println("Error saving config");
-            return;
-          }  
-          Serial.println("config saved. Restarting.. ");
-
-          ESP.restart();
-
-    }
-}
 
 void beginOTAUpdate()
 {
@@ -683,22 +545,37 @@ void handleAPI()
   }
   else if (server.hasArg("update"))
   {
-      updateFromGithub();
-
-      if (updateURL.length() == 0)
-      {
-        server.send(404, "text/plain", "No Update found");
-        return;
-      }
-
-      doUpdate();
+    handleGithubUpdate();
   }
 
   server.sendHeader("Location","/");
   server.send(303);  
 }
 
-
 void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+}
+void handleGithubUpdate()
+{
+  GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL);
+
+  if (! gh_updater.checkUpdate(config.release_tag))
+  {
+    server.send(404, "text/plain", "No Update found");
+    return;
+  }
+
+  if (gh_updater.doUpdate())
+  {
+    strncpy(config.release_tag, gh_updater.release_tag.c_str(), 4);
+
+    if (! saveConfig(CONFIGFILE))
+    {
+      Serial.println("Error saving config");
+      return;
+    }  
+    Serial.println("config saved. Restarting.. ");
+
+    ESP.restart();
+  }
 }
