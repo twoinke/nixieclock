@@ -67,7 +67,7 @@ bool GithubOTA::checkUpdate(String current_release_tag)
 
   if (current_release_tag == release_tag || doc["prerelease"])
   {
-    Serial.println("No update found1.");
+    Serial.println("No update found.");
     return false;  
   }
 
