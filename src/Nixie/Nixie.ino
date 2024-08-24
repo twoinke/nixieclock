@@ -118,8 +118,6 @@ struct configStruct config;
 
 time_t now;
 tm tm;
-// volatile uint8_t tubes[4];
-
 
 NixieMultiplexer mux;
 
@@ -147,68 +145,12 @@ uint32_t sntp_update_delay_MS_rfc_not_less_than_15000 ()
   return HRS_12; 
 }
 
-// int8_t IRAM_ATTR dec_to_bcd(int8_t dec)
-// {
-//   int8_t result=0;
-  
-//   result |= (dec / 10) << 4;
-//   result |= (dec % 10) << 0;
-  
-//   return result;
-// }
-
-// void IRAM_ATTR writeByte(int8_t b)
-// {
-//   digitalWrite(D0, bitRead(b, 0));
-//   digitalWrite(D1, bitRead(b, 1));
-//   digitalWrite(D2, bitRead(b, 2));
-//   digitalWrite(D3, bitRead(b, 3));
-//   digitalWrite(D4, bitRead(b, 4));
-//   digitalWrite(D5, bitRead(b, 5));
-//   digitalWrite(D6, bitRead(b, 6));
-//   digitalWrite(D7, bitRead(b, 7));
-// }
-
-
-// void IRAM_ATTR updateNixies()
-// {
-//   static int8_t tube = 4;
-//   static bool toggle = true;
-
-//   if (! toggle )
-//   {
-//     toggle = true;
-//     writeByte(0);
-
-//     return;
-//   }
-
-//   if (! config.enabled )
-//   {
-//     return;
-//   }
-
-//   if (tube == 0) tube = 4;
-
-//   writeByte(tubes[--tube]);
-//   toggle = false;
-// }
-
 void IRAM_ATTR TimerHandler()
 {
   ISR_Timer.run();
   
   mux.updateNixies();
 }
-
-
-// void IRAM_ATTR setNixieTube(int8_t tube_nr, int8_t bcdval)
-// {
-//   // translation table to fix mixup of nixie pins on PCB
-//   static int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
-  
-//   tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
-// }
 
 void IRAM_ATTR getTime()
 { 
@@ -262,14 +204,8 @@ void IRAM_ATTR getTime()
     return;
   }
   
-  tmp = mux.dec_to_bcd((int8_t)tm.tm_min);
-  mux.setNixieTube(3, 0x0f & tmp);
-  mux.setNixieTube(2, (tmp >> 4));
+  mux.setTime((uint8_t)tm.tm_hour, (uint8_t)tm.tm_min);
 
-
-  tmp = mux.dec_to_bcd((int8_t)tm.tm_hour);
-  mux.setNixieTube(1, 0x0f & tmp);
-  mux.setNixieTube(0, (tmp >> 4));
 
 #ifdef DEBUG
   Serial.printf("[%02x:%02x:%02x:%02x]\n", tubes[0], tubes[1], tubes[2], tubes[3]);
@@ -336,17 +272,6 @@ bool saveConfig(const char * filename)
 
 void setup() 
 {   
-  // pinMode(D0, OUTPUT);  
-  // pinMode(D1, OUTPUT);  
-  // pinMode(D2, OUTPUT);  
-  // pinMode(D3, OUTPUT);  
-  // pinMode(D4, OUTPUT);  
-  // pinMode(D5, OUTPUT);  
-  // pinMode(D6, OUTPUT);  
-  // pinMode(D7, OUTPUT);  
-  // pinMode(D8, OUTPUT); 
-
-  // writeByte(0);
   
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler);
   
@@ -676,13 +601,6 @@ void onOTAEnd(bool success)
   Serial.println("There was an error during OTA update!");
 }
 
-void initOTA()
-{
-
-
-}
-
-
 void loop(void)
 {
   server.handleClient();                    // Listen for HTTP requests from clients
@@ -732,7 +650,7 @@ void handleAPI()
       config.enabled = 1;
       Serial.printf("Enabled: %d\n", config.enabled);
     }
-    mux.SetEnabled(config.enabled);
+    mux.setEnabled(config.enabled);
     saveConfig(CONFIGFILE);
 
   }

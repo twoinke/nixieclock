@@ -23,7 +23,7 @@ NixieMultiplexer::~NixieMultiplexer()
 
 }
 
-void NixieMultiplexer::SetEnabled(bool e)
+void NixieMultiplexer::setEnabled(bool e)
 {
   enabled = e;
 }
@@ -81,4 +81,19 @@ void IRAM_ATTR NixieMultiplexer::setNixieTube(int8_t tube_nr, int8_t bcdval)
   static int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
   
   tubes[tube_nr] = ((1 << tube_nr) << 4) | trans[bcdval];
+}
+
+
+void IRAM_ATTR NixieMultiplexer::setTime(uint8_t hour, uint8_t min)
+{
+  uint8_t tmp;
+
+  tmp = dec_to_bcd(min);
+  setNixieTube(3, 0x0f & tmp);
+  setNixieTube(2, (tmp >> 4));
+
+
+  tmp = dec_to_bcd(hour);
+  setNixieTube(1, 0x0f & tmp);
+  setNixieTube(0, (tmp >> 4));
 }
