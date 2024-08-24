@@ -410,15 +410,6 @@ void setup()
 }
 
 
-
-void updateFromGithub() 
-{
-  
-}
-
-
-
-
 void beginOTAUpdate()
 {
   Serial.println("update process started.");
