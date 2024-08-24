@@ -30,11 +30,14 @@ jobs:
       - name: Compile Sketch
         run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone:xtal=80,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=3232,non32xfer=fast,FlashMode=dout,FlashFreq=40,eesz=4M1M --warnings all ./src/Nixie
 
+      - name: Compress artifact
+        run: gzip -9 -k src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: nixie-binary
-          path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin
+          path: src/Nixie/build/esp8266.esp8266.d1_mini_clone/Nixie.ino.bin.gz
   
   release:
     needs: build
@@ -59,5 +62,6 @@ jobs:
           body: Automatically generated release ${{ github.run_number }}
           draft: false
           prerelease: true
+          artifactContentType: "application/gzip"
           artifacts: |
-            Nixie.ino.bin  
+            Nixie.ino.bin.gz
