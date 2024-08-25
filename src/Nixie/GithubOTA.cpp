@@ -29,8 +29,6 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
     return false;
   }
 
-  Serial.printf("Connection to %s established\n", update_host);
-
   char request[255];
   snprintf(request, 255, "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\nConnection: close\r\n\r\n", update_url, update_host);
 
@@ -73,8 +71,6 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
     return false;
   }
 
-  Serial.println("Update found.");
-
   JsonArray assets = doc["assets"];
   bool valid_asset = false;
   for (auto asset : assets) 
@@ -103,17 +99,13 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
 bool GithubOTA::doUpdate()
 {
   WiFiClientSecure updateClient;
-  Serial.printf("Updating from %s\n", download_url);
 
   updateClient.setInsecure();
-
-
 
   bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
   if (mfln) 
   {
     updateClient.setBufferSizes(1024, 1024);
-    Serial.println("Set buffer sizes to 1024");
   }
 
   ESPhttpUpdate.setLedPin(D8, HIGH);
@@ -122,19 +114,10 @@ bool GithubOTA::doUpdate()
 
   t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, download_url);
 
-  switch (ret) 
+  if (ret != HTTP_UPDATE_OK)
   {
-    case HTTP_UPDATE_FAILED:
-        Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
-        return false;
-
-    case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("HTTP_UPDATE_NO_UPDATES");
-        return false;
-
-    case HTTP_UPDATE_OK:
-        Serial.println("Update successful");
-        return true;
+    Serial.println("Update Failed: " + ESPhttpUpdate.getLastErrorString());
+    return false;
   }
 
   return false;

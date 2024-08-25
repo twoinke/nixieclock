@@ -213,18 +213,15 @@ unsigned long ota_progress_millis = 0;
 
 
 //callback notifying us of the need to save config
-void saveConfigCallback () {
-  Serial.println("Should save config");
+void saveConfigCallback () 
+{
   shouldSaveConfig = true;
 }
 
 
 
 bool loadConfig(const char *filename)
-{
-
-  Serial.println("mounted file system");
-  
+{  
   if (! SPIFFS.exists(filename))
   {
     Serial.println("Config file not found");
@@ -314,7 +311,6 @@ void setup()
     Serial.println("format done.");
 
     saveConfig(CONFIGFILE);
-
   }
 
   if (config.led_mode == LEDS_ON)
@@ -333,11 +329,6 @@ void setup()
   wifiManager.addParameter(&custom_ntp_server);
   wifiManager.addParameter(&custom_timezone);
 
-
-  
- 
-  Serial.printf("Connecting to Wifi..");
-
   wifiManager.autoConnect("NixieConfigAP");
   
   strncpy(config.hostname,    custom_hostname.getValue(), 32); 
@@ -351,7 +342,6 @@ void setup()
    //save the custom parameters to FS
   if (shouldSaveConfig) 
   {
-    Serial.println("saving config");
     if (! saveConfig(CONFIGFILE))
     {
       Serial.println("Error saving config");
@@ -360,8 +350,6 @@ void setup()
   
   if (config.update_startup)
   {
-    Serial.println("checking for online update");
-
     handleGithubUpdate();
   }
   
@@ -369,17 +357,13 @@ void setup()
   mux.setNixieTube(3, 4);
 
   WiFi.hostname(config.hostname);
+  MDNS.begin(config.hostname);
 
 #ifdef DEBUG
   settimeofday_cb(time_is_set); // optional: callback if time was sent
 #endif
   configTime(config.timezone, config.ntp_server); // --> Here is the IMPORTANT ONE LINER needed in your sketch!
 
-  if (!MDNS.begin(config.hostname))
-  {
-    Serial.println("Error setting up mDNS responder");  
-  }
-  
   ISR_Timer.setInterval(TIMER_INTERVAL_1S, getTime);
 
   server.on("/", handleRoot);               // Call the 'handleRoot' function when a client requests URI "/"
@@ -395,25 +379,20 @@ void setup()
   ESPhttpUpdate.onProgress(onOTAProgress);
 
   ElegantOTA.onEnd(onOTAEnd);
-  ESPhttpUpdate.onEnd(onOTAEnd2);
 
   ElegantOTA.begin(&server);
 
   // httpUpdater.setup(&server);
   server.begin();                           // Actually start the server
   Serial.println("HTTP server started"); 
-
-
-
 }
 
 
 void beginOTAUpdate()
 {
-  Serial.println("update process started.");
+  Serial.println("checking for update");
   // OTA will fail with HW timers enabled
   ISR_Timer.disableAll();
-  Serial.println("HW timers disabled.");
 
   mux.writeByte(0);
   pinMode(D0, INPUT);  
@@ -436,10 +415,6 @@ void onOTAProgress(size_t current, size_t final)
   }
 }
 
-void onOTAEnd2()
-{
-  onOTAEnd(true);
-}
 void onOTAEnd(bool success)
 {
   // Log when OTA has finished
