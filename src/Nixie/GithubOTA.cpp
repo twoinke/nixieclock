@@ -12,7 +12,7 @@ GithubOTA::GithubOTA(const char *  host, const char *  url, const char *  type, 
   update_host     = host;
   update_url      = url;
   update_type     = type;
-  update_filename = update_filename;
+  update_filename = filename;
 }
 
 
@@ -84,6 +84,7 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
     const char* asset_url = asset["browser_download_url"];
 
     Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
+    Serial.printf("Name: [%s], Type: [%s]\n", update_filename, update_type);
 
     if (strcmp(asset_type, update_type) == 0 && strcmp(asset_name, update_filename) == 0) 
     {
@@ -115,7 +116,8 @@ bool GithubOTA::doUpdate()
     Serial.println("Set buffer sizes to 1024");
   }
 
-
+  ESPhttpUpdate.setLedPin(D8, HIGH);
+  ESPhttpUpdate.rebootOnUpdate(false);
   ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
   t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, download_url);
