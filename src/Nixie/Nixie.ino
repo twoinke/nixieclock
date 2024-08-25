@@ -3,6 +3,8 @@
 
 #define UPDATE_HOST "api.github.com"
 #define UPDATE_URL "/repos/twoinke/nixieclock/releases/latest"
+#define UPDATE_FILENAME "Nixie.ino.bin.gz"
+#define UPDATE_TYPE "application/gzip"
 
 
 
@@ -99,9 +101,6 @@ const char homepage[] PROGMEM =
 "  </fieldset>"
 "  </form></p>"
 "</body></html>";
-
-
-String updateURL = "";
 
 struct configStruct {
   char hostname[32];
@@ -336,6 +335,9 @@ void setup()
   wifiManager.addParameter(&custom_hostname);
   wifiManager.addParameter(&custom_ntp_server);
   wifiManager.addParameter(&custom_timezone);
+
+  ESPhttpUpdate.setLedPin(D8, HIGH);
+  ESPhttpUpdate.rebootOnUpdate(false);
   
  
   Serial.printf("Connecting to Wifi..");
@@ -542,12 +544,15 @@ void handleAPI()
   server.send(303);  
 }
 
-void handleNotFound(){
+void handleNotFound()
+{
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
+
+
 void handleGithubUpdate()
 {
-  GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL);
+  GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (! gh_updater.checkUpdate(config.release_tag))
   {
@@ -557,7 +562,7 @@ void handleGithubUpdate()
 
   if (gh_updater.doUpdate())
   {
-    strncpy(config.release_tag, gh_updater.release_tag.c_str(), 4);
+    strncpy(config.release_tag, gh_updater.release_tag, 4);
 
     if (! saveConfig(CONFIGFILE))
     {

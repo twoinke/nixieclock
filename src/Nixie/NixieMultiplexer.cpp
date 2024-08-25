@@ -65,7 +65,7 @@ void IRAM_ATTR NixieMultiplexer::updateNixies()
 }
 
 
-int8_t IRAM_ATTR NixieMultiplexer::dec_to_bcd(int8_t dec)
+int8_t NixieMultiplexer::dec_to_bcd(int8_t dec)
 {
   int8_t result=0;
   
@@ -75,7 +75,7 @@ int8_t IRAM_ATTR NixieMultiplexer::dec_to_bcd(int8_t dec)
   return result;
 }
 
-void IRAM_ATTR NixieMultiplexer::setNixieTube(int8_t tube_nr, int8_t bcdval)
+void NixieMultiplexer::setNixieTube(int8_t tube_nr, int8_t bcdval)
 {
   // translation table to fix mixup of nixie pins on PCB
   static int8_t trans[] = { 1,0,9,8,7,6,5,4,3,2 };
@@ -84,7 +84,7 @@ void IRAM_ATTR NixieMultiplexer::setNixieTube(int8_t tube_nr, int8_t bcdval)
 }
 
 
-void IRAM_ATTR NixieMultiplexer::setTime(uint8_t hour, uint8_t min)
+void NixieMultiplexer::setTime(uint8_t hour, uint8_t min)
 {
   uint8_t tmp;
 
