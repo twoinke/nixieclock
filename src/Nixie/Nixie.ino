@@ -6,9 +6,6 @@
 #define UPDATE_FILENAME "Nixie.ino.bin.gz"
 #define UPDATE_TYPE "application/gzip"
 
-
-
-
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266WebServer.h> 
@@ -270,7 +267,7 @@ bool saveConfig(const char * filename)
 
 void setup() 
 {   
-  
+
   ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler);
   
 
@@ -336,8 +333,7 @@ void setup()
   wifiManager.addParameter(&custom_ntp_server);
   wifiManager.addParameter(&custom_timezone);
 
-  ESPhttpUpdate.setLedPin(D8, HIGH);
-  ESPhttpUpdate.rebootOnUpdate(false);
+
   
  
   Serial.printf("Connecting to Wifi..");
