@@ -30,10 +30,11 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
   }
 
   Serial.printf("Connection to %s established\n", update_host);
-  client.print(String("GET ") + update_url + " HTTP/1.1\r\n" +
-    "Host: " + String(update_host) + "\r\n" +
-    "User-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\n" +
-    "Connection: close\r\n\r\n");
+
+  char request[255];
+  snprintf(request, 255, "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\nConnection: close\r\n\r\n", update_url, update_host);
+
+  client.print(request);
 
   
   while (client.connected()) 
@@ -54,8 +55,6 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
     Serial.println("Error parsing JSON response");
     return false;
   }
-
-  // const char* release_tag;
 
   if (! doc.containsKey("tag_name")) 
   {
