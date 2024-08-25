@@ -7,14 +7,16 @@
 #include "GithubOTA.h"
 
 
-GithubOTA::GithubOTA(String host, String url)
+GithubOTA::GithubOTA(const char *  host, const char *  url, const char *  type, const char *  filename)
 {
-  update_host = host;
-  update_url  = url;
+  update_host     = host;
+  update_url      = url;
+  update_type     = type;
+  update_filename = update_filename;
 }
 
 
-bool GithubOTA::checkUpdate(String current_release_tag)
+bool GithubOTA::checkUpdate(const char * current_release_tag)
 {
   JsonDocument doc;
   WiFiClientSecure client;
@@ -23,11 +25,11 @@ bool GithubOTA::checkUpdate(String current_release_tag)
 
   if (!client.connect(update_host, 443)) 
   {
-    Serial.printf("Connection to %s failed\n", update_host.c_str() );
+    Serial.printf("Connection to %s failed\n", update_host );
     return false;
   }
 
-  Serial.printf("Connection to %s established\n", update_host.c_str());
+  Serial.printf("Connection to %s established\n", update_host);
   client.print(String("GET ") + update_url + " HTTP/1.1\r\n" +
     "Host: " + String(update_host) + "\r\n" +
     "User-Agent: NixieClock_ESP_OTA_GitHubUpdater\r\n" +
@@ -61,21 +63,16 @@ bool GithubOTA::checkUpdate(String current_release_tag)
     return false;
   }
 
-  release_tag = String(doc["tag_name"]);
-  Serial.println("Found release " + release_tag + "\n");
+  release_tag = doc["tag_name"];
+
+  Serial.printf("Found release %s\n", release_tag);
   Serial.printf("Current release %s\n", current_release_tag); 
 
-  if (current_release_tag == release_tag || doc["prerelease"])
+  if (strcmp(release_tag, current_release_tag) == 0 || doc["prerelease"]) 
   {
     Serial.println("No update found.");
-    return false;  
+    return false;
   }
-
-  // if (strcmp(release_tag.c_str(), current_release_tag.c_str()) == 0 || doc["prerelease"]) 
-  // {
-  //   Serial.println("No update found2.");
-  //   return false;
-  // }
 
   Serial.println("Update found.");
 
@@ -89,35 +86,24 @@ bool GithubOTA::checkUpdate(String current_release_tag)
 
     Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
 
-    if (strcmp(asset_type, "application/gzip") == 0 && strcmp(asset_name, UPDATE_BINFILE_COMPRESSED) == 0) 
+    if (strcmp(asset_type, update_type) == 0 && strcmp(asset_name, update_filename) == 0) 
     {
       download_url = asset_url;
 
-      Serial.println("Update URL:" + download_url);
-
-      return true;
-    }
-
-    if (strcmp(asset_type, "application/octet-stream") == 0 && strcmp(asset_name, UPDATE_BINFILE) == 0) 
-    {
-      download_url = asset_url;
-
-      Serial.println("Update URL:" + download_url);
-
+      Serial.printf("Update URL: %s\n", download_url);
 
       return true;
     }
   }
 
   return false;
-
 }
 
 
 bool GithubOTA::doUpdate()
 {
   WiFiClientSecure updateClient;
-  Serial.println("Updating from " + download_url);
+  Serial.printf("Updating from %s\n", download_url);
 
   updateClient.setInsecure();
 
@@ -130,12 +116,8 @@ bool GithubOTA::doUpdate()
     Serial.println("Set buffer sizes to 1024");
   }
 
-  ESPhttpUpdate.setLedPin(D8, HIGH);
-  ESPhttpUpdate.rebootOnUpdate(false);
+
   ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-  Serial.println("Updating from " + download_url);
-
 
   t_httpUpdate_return ret = ESPhttpUpdate.update(updateClient, download_url);
 
@@ -152,9 +134,7 @@ bool GithubOTA::doUpdate()
     case HTTP_UPDATE_OK:
         Serial.println("Update successful");
         return true;
-
-
   }
-  return false;
 
+  return false;
 }
