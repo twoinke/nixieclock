@@ -274,10 +274,10 @@ void setup()
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   // init config struct with default values
-  strncpy(config.ntp_server, MY_NTP_SERVER, 32);
-  strncpy(config.hostname, MY_HOSTNAME, 32);
-  strncpy(config.timezone, MY_TZ, 32);
-  strncpy(config.release_tag, RELEASE_TAG, 4);
+  strncpy(config.ntp_server, MY_NTP_SERVER, 31);
+  strncpy(config.hostname, MY_HOSTNAME, 31);
+  strncpy(config.timezone, MY_TZ, 31);
+  strncpy(config.release_tag, RELEASE_TAG, 3);
   config.led_mode = LEDS_ON;
   config.enabled = true;
   config.update_startup = false;
@@ -331,9 +331,6 @@ void setup()
 
   wifiManager.autoConnect("NixieConfigAP");
   
-  strncpy(config.hostname,    custom_hostname.getValue(), 32); 
-  strncpy(config.ntp_server,  custom_ntp_server.getValue(), 32);
-  strncpy(config.timezone,    custom_timezone.getValue(), 32);
   
   mux.writeByte(0);
   mux.setNixieTube(2, 3);
@@ -342,6 +339,10 @@ void setup()
    //save the custom parameters to FS
   if (shouldSaveConfig) 
   {
+    strncpy(config.hostname,    custom_hostname.getValue(), 31); 
+    strncpy(config.ntp_server,  custom_ntp_server.getValue(), 31);
+    strncpy(config.timezone,    custom_timezone.getValue(), 31);
+
     if (! saveConfig(CONFIGFILE))
     {
       Serial.println("Error saving config");
@@ -533,7 +534,7 @@ void handleGithubUpdate()
 
   if (gh_updater.doUpdate())
   {
-    strncpy(config.release_tag, gh_updater.release_tag, 4);
+    strncpy(config.release_tag, gh_updater.release_tag, 3);
 
     if (! saveConfig(CONFIGFILE))
     {
