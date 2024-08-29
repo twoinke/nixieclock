@@ -108,13 +108,7 @@ bool GithubOTA::doUpdate()
   }
 
   updateClient.setInsecure();
-  updateClient.setBufferSizes(1024, 1024);
-
-  // bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
-  // if (mfln) 
-  // {
-  // }
-
+ 
   ESPhttpUpdate.setLedPin(D8, HIGH);
   ESPhttpUpdate.rebootOnUpdate(false);
   ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
