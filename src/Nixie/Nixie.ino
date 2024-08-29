@@ -391,7 +391,6 @@ void setup()
 
 void beginOTAUpdate()
 {
-  Serial.println("checking for update");
   // OTA will fail with HW timers enabled
   ISR_Timer.disableAll();
 
