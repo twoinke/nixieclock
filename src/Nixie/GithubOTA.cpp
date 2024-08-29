@@ -86,7 +86,7 @@ bool GithubOTA::checkUpdate(const char * current_release_tag)
     {
       download_url = asset_url;
 
-      Serial.printf("Update URL: %s\n", download_url);
+      Serial.println("Update URL: " + download_url);
 
       return true;
     }
@@ -100,13 +100,20 @@ bool GithubOTA::doUpdate()
 {
   WiFiClientSecure updateClient;
 
-  updateClient.setInsecure();
 
-  bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
-  if (mfln) 
+  if (download_url.length() == 0)
   {
-    updateClient.setBufferSizes(1024, 1024);
+    Serial.println("No download URL");
+    return false;
   }
+
+  updateClient.setInsecure();
+  updateClient.setBufferSizes(1024, 1024);
+
+  // bool mfln = updateClient.probeMaxFragmentLength("objects.githubusercontent.com", 443, 1024);
+  // if (mfln) 
+  // {
+  // }
 
   ESPhttpUpdate.setLedPin(D8, HIGH);
   ESPhttpUpdate.rebootOnUpdate(false);
@@ -120,5 +127,5 @@ bool GithubOTA::doUpdate()
     return false;
   }
 
-  return false;
+  return true;
 }

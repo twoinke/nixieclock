@@ -20,7 +20,7 @@ protected:
   const char * update_filename;
   const char * update_host;
   const char * update_url;
-  const char * download_url;
+  String download_url;
 };
 
 
